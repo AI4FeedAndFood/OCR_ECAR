@@ -197,9 +197,6 @@ def after_key_process(candidates, bound_keys, similarity=0.85):
 def date_process(candidates, strip):
     match_indices, res_seq = [], []
     for i_candidate, candidate in enumerate(candidates):
-        
-        print(candidates)
-
         try:
             word_test = " ".join(candidate["text"])
             date  = datetime.strptime(word_test, "%B %d, %Y")
@@ -327,8 +324,6 @@ def check_process(candidates, sense, checkboxes, lists_df, list_condition_dict):
                 if 0<dist<min_dist:
                     min_dist = dist
                     nearest_candidate, n_index = candidate, i_cand
-
-        print(nearest_candidate)
 
         if nearest_candidate:
 

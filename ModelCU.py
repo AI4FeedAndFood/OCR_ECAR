@@ -5,7 +5,7 @@ import pandas as pd
 
 import re
 import cv2
-import os
+import sys, os
 
 from copy import deepcopy
 from unidecode import unidecode
@@ -23,10 +23,17 @@ from ConditionFilter import condition_filter
 
 MODEL = "CU OAIC"
 
-OCR_HELPER_JSON_PATH  = r"CONFIG\OCR_config.json"
+if 'AppData' in sys.executable:
+    application_path = os.getcwd()
+else : 
+    application_path = os.path.dirname(sys.executable)
+
+OCR_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\OCR_config.json")
 OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH, encoding="utf-8"))
 MODEL_HELPER = OCR_HELPER[MODEL]
-CHECK_PATH = OCR_HELPER["checkboxes_path"][MODEL]
+
+CHECK_PATH = os.path.join(application_path, OCR_HELPER["checkboxes_path"][MODEL])
+ANALYSIS_PATH = os.path.join(application_path, OCR_HELPER["analysis_path"])
 
 NULL_OCR = {"text" : "",
             "box" : [],
@@ -265,7 +272,7 @@ def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELP
 
         # print(zone, " : ", candidate_dicts)
 
-        match_indices, res_seq = condition_filter(candidate_dicts, condition, model, path=OCR_HELPER["analysis_path"], checkboxes=checkboxes)
+        match_indices, res_seq = condition_filter(candidate_dicts, condition, model, path=ANALYSIS_PATH, checkboxes=checkboxes)
 
         if len(res_seq)!=0:
             if type(res_seq[0]) != type([]):

@@ -111,6 +111,7 @@ def convertDictToLIMS(verified_dict, analysis_lims, lims_converter, client_contr
     CustomerCode, Contractcode, QuotationCode = list(corresponding_row["CustomerCode"])[0], list(corresponding_row["ContractCode"])[0], list(corresponding_row["QuotationCode"])[0]
 
     if len(corresponding_row) == 1:
+        scan_clean_dict["Name"] = clientName
         scan_clean_dict["CustomerCode"] = CustomerCode
         scan_clean_dict["ContractCode"] = Contractcode
         scan_clean_dict["QuotationCode"] = QuotationCode

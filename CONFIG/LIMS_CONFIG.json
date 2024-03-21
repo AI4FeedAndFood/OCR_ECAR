@@ -20,8 +20,11 @@
         "code_produit" : "Code produit"
     },
 
-    "LIMS_CONVERTER" : {
-        
+    "LIMS_CONVERTER" : {    
+        "Name" : {
+            "path" : "Order.Name",
+            "input": "Name"
+        },
         "RecipientLabCode" : {
             "path" : "Order.RecipientLabCode",
             "input": "HARDCODE",

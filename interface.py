@@ -1,5 +1,5 @@
 import PySimpleGUI as sg
-import os
+import sys, os
 import shutil
 import numpy as np
 import io
@@ -10,7 +10,12 @@ from copy import deepcopy
 from screeninfo import get_monitors
 from PIL import Image
 
-OCR_HELPER_JSON_PATH  = r"CONFIG\OCR_config.json"
+if 'AppData' in sys.executable:
+    application_path = os.getcwd()
+else : 
+    application_path = os.path.dirname(sys.executable)
+
+OCR_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\OCR_config.json")
 OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH))
 
 from LaunchTool import getAllImages, TextCVTool
