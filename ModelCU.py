@@ -299,18 +299,17 @@ def model_particularities(zone_matches):
     # Add M/V to the navire
     zone_matches["navire"]["sequence"] = "M/V - " + zone_matches["navire"]["sequence"]
 
+    # Delte scelles mistake
+    zone_matches["scelles"]["sequence"] = "" if jaro_distance(zone_matches["scelles"]["sequence"].lower(), "autres")>0.90 else zone_matches["scelles"]["sequence"]
+
     # Select a product Code
-    product_code_dict = {
-        "Blé tendre" : "06161",
-        "Blé dur" : "05414",
-        "Fourrage orge" : "08794",
-        "Orge de brasserie" : "05859"
-    }
+    product_code_dict = ["Blé tendre", "Blé dur", "Fourrage orge", "Orge de brasserie"]
+
     marchandise = zone_matches["marchandise"]["sequence"]
     product_code = ""
-    for key, code in product_code_dict.items():
-        if jaro_distance(unidecode(key.upper()), marchandise)>0.95:
-            product_code = code + ": " + key
+    for pc in product_code_dict:
+        if jaro_distance(unidecode(pc.upper()), marchandise)>0.95:
+            product_code = pc
     zone_matches["code_produit"] = deepcopy(zone_matches["marchandise"])
     zone_matches["code_produit"]["sequence"] = product_code 
 
@@ -347,7 +346,7 @@ def main(scan_dict, model=MODEL):
             print("--------------", image_name, "--------------")
 
             image = binarized_image(sample_image)  
-            # image = get_adjusted_image(bin_image, show=False)
+            # image = get_adjusted_image(image, show=False)
             # plt.imsave("im.png", image, cmap="gray")
 
 

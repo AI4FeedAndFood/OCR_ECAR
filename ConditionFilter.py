@@ -38,12 +38,12 @@ def list_process(candidates, condition_dict, lists_df, min_jaro = 0.87):
         }
 
         for i_word, word in enumerate(candidate_sequence):
-            if check_word.lower() in [ word.strip(": _;").lower(), sub_mistakes(word).strip(": _;").lower()]:
+            if unidecode(check_word.lower()) in [unidecode(word.strip(": _;").lower()), unidecode(sub_mistakes(word).strip(": _;").lower())]:
                 status_dict["find"], status_dict["index"] = True, candidate_index[i_word]
                 status_dict["jaro"], status_dict["word"] = 1, check_word
                 return status_dict
             
-            jaro = jaro_distance(word.lower(), check_word.lower())
+            jaro = jaro_distance(unidecode(word.lower()), unidecode(check_word.lower()))
             if jaro > max_jaro:
                 status_dict["find"], status_dict["index"] = True, candidate_index[i_word]
                 status_dict["jaro"], status_dict["word"] = jaro, check_word
@@ -248,7 +248,6 @@ def date_process(candidates, strip):
                 full_date = "".join(candidate[i_word-1:i_word+2])
                 _ = bool(datetime.strptime(full_date, "%d%B%Y"))
                 return [i_candidate], [word]
-
             except:
                 continue
             

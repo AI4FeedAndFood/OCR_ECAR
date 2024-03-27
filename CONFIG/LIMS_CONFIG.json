@@ -1,7 +1,7 @@
 {
     "TOOL_PATH" : {
-        "input_folder" : "C:\\Users\\CF6P\\Desktop\\ECAR\\Data\\test",
-        "output_folder" : ""
+        "input_folder" : "C:\\Users\\CF6P\\Desktop\\ECAR\\Data\\CU\\OAIC",
+        "output_folder" : "\\\\itiz-ft-fr.local\\AAG010\\Shared\\B2BPreprod\\Orders\\Eurofins_OCR_Tool"
     },
     
     "CLEAN_ZONE" : {
@@ -28,7 +28,7 @@
         "RecipientLabCode" : {
             "path" : "Order.RecipientLabCode",
             "input": "HARDCODE",
-            "value" : "EUFR56"
+            "value" : "EUFR57"
         },
         "CustomerCode" : {
             "path" : "Order.CustomerCode",

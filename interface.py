@@ -32,7 +32,13 @@ def is_valid(folderpath, model):
         sg.popup_error("Le dossier n'existe pas")
         return False
     
-    return True
+    scan_dict = getAllImages(folderpath)
+
+    if scan_dict == {}:
+        sg.popup_ok("Aucun PDF n'est trouvé dans le dossier")
+        return False
+    
+    return scan_dict
 
 def fit_the_screen(X_loc):
     ordered_monitors = sorted([monitor for monitor in get_monitors()], key=lambda mtr: mtr.x)
@@ -71,7 +77,7 @@ def listSuggestionWindow(sugg_values, mainWindow, verif_event):
     if not sugg_values:
         return
     layout = [
-        [sg.Listbox(sugg_values, size=(40, 3), enable_events=True, key='-SUGG-',
+        [sg.Listbox(sugg_values, size=(40, 3), enable_events=True, key=('SUGG',),
             select_mode=sg.LISTBOX_SELECT_MODE_SINGLE)]]
     return sg.Window('Title', layout, no_titlebar=True, keep_on_top=True,
         location=(x, y), margins=(0, 0), finalize=True)
@@ -82,7 +88,14 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
     lineLayout = []
     global_field = 1
 
+    # Field that doesn't come from the sheet naturally
     added_field = ["analyse_specification", "code_produit", "client"]
+    product_codes = {
+        "Blé tendre": "06161",
+        "Blé dur": "05414",
+        "Fourrage orge": "08794",
+        "Orge de brasserie": "05859"}
+    found_product_code = extract_dict["code_produit"]["sequence"]
 
     # Number of detected analysis
     i_ana = 0
@@ -90,9 +103,8 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
     # Add filed to find the contract
     if "CU" in model:
         lineLayout.append([sg.T("Client :"), sg.Push(), sg.Radio('CU Rouen', "client", default=True, key=("client", "Rouen")), sg.Radio('CU Saint-Nazaire', "client", key=("client", "Saint-Nazaire"), default=False), sg.Push()])
-        lineLayout.append([sg.Text("Code produit", s=(25,1)),
-                                sg.I(extract_dict["code_produit"]["sequence"], key=("zone", "code_produit"), expand_y=False, expand_x=False, size=(INPUT_LENGTH, 1), justification='left')])
-        
+        pructcode_radio = [sg.Text("Code produit", s=(25,1))] + [sg.Radio(product, "pc", default=(found_product_code in [product, code]), key=("code_produit", code)) for product, code in product_codes.items()]
+        lineLayout.append(pructcode_radio)
     # Returned the tool's response for each field
     for zone, landmark_text_dict in extract_dict.items():
         if not zone in added_field: # Field filled by the technicien
@@ -133,7 +145,7 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
                     col.append(row)
 
                 frameLayout.append([sg.Column(col, key="-COL-", vertical_scroll_only=True, scrollable=True, expand_y=False, size=(int(X_main_dim*0.45), int(Y_main_dim*0.3)))])
-                frameLayout.append([sg.Push(), sg.B("Ajouter une analyse"), sg.Push()])
+                frameLayout.append([sg.Push(), sg.B("Ajouter une analyse", key=("add",)), sg.Push()])
 
                 lineLayout.append([sg.Frame("Analyses et commentaires", frameLayout, expand_y=True)])
 
@@ -210,29 +222,6 @@ def get_image(scan_dict, pdf_name, sample_image_name):
         l_image.append(scan_dict[pdf_name][image])
     return np.concatenate(l_image)
 
-def process_suggestion(verif_event, verif_values, ANALYSIS_LIST, VerificationWindow, SuggestionW, sugg_index):
-
-    sugg_text = verif_values[verif_event]
-    sugg_text = sugg_text[0] if type(sugg_text) == type([]) else sugg_text
-    client_sugg = sorted([sugg for sugg in ANALYSIS_LIST if sugg_text.lower() in str(sugg).lower()])
-
-    if sugg_text and client_sugg:
-        if SuggestionW :
-            SuggestionW.BringToFront()
-            SuggestionW["-SUGG-"].update(values=client_sugg)
-            SuggestionW.refresh()
-        elif len(sugg_text)>1 :
-            SuggestionW = listSuggestionWindow(client_sugg, VerificationWindow, verif_event)
-            SuggestionW.BringToFront()              
-                                                                
-    if verif_event == '-SUGG-':
-        SuggestionW.close()
-        SuggestionW = False
-        text = verif_values['-SUGG-'][0]
-        VerificationWindow[("ana", sugg_index)].update(value=text)
-
-    return  verif_event, verif_values, VerificationWindow, SuggestionW
-
 def welcomeLayout():
 
     welcomeLayout = [
@@ -247,44 +236,88 @@ def welcomeLayout():
     
     return welcomeLayout
 
-def manually_add_order(MainLayout, res_dict, i_ana, X_loc, Y_loc, X_dim, Y_dim):
+def manually_add_order(MainLayout, res_dict, i_ana_add, MODEL_ANALYSIS, loc, dim, pdf_name):
+    sugg_index_add = None
     sample_name = "echantillon_manuel_"
     num = 0
     VerificactionLayout_add = MainLayout
     VerificationWindow_add = sg.Window(f"Fiche {sample_name}",
-                                VerificactionLayout_add, use_custom_titlebar=True, location=(X_loc+30, Y_loc), 
-                                size=(X_dim, Y_dim), resizable=True, finalize=True, )
+                                VerificactionLayout_add, use_custom_titlebar=True, location=loc, 
+                                size=dim, resizable=True, finalize=True, )
+    SuggestionW_add = None
     deleted_rows_add = []
-    while True:
-        add_windows, verif_event_add, verif_values_add = sg.read_all_windows()
 
+    while True:
+        add_window, verif_event_add, verif_values_add = sg.read_all_windows()
         if verif_event_add == sg.WINDOW_CLOSED:
             return None, None, None
         
-        if "del" in verif_event_add:
-            deleted_rows_add.append(verif_event_add.split("_")[1])
-            add_windows[("row", verif_event_add[1])].update(visible=False)
-            add_windows.visibility_changed()
-            add_windows.refresh()
-        
-        if verif_event_add == "Ajouter une analyse":
-            add_windows.extend_layout(add_windows['-COL-'], [create_row(i_ana, "", "")])
-            i_ana+=1
-            add_windows['-COL-'].contents_changed()
-            add_windows.visibility_changed()
-            add_windows.refresh()
-
-
+        if verif_event_add[0] in ["ana", "SUGG", "add", "del"]:
+            verif_event_add, deleted_rows_add, i_ana_add, sugg_index_add, SuggestionW_add = suggestion_interaction(add_window, verif_event_add, verif_values_add, SuggestionW_add, VerificationWindow_add, deleted_rows_add, i_ana_add, sugg_index_add, MODEL_ANALYSIS)
         if verif_event_add == "Valider ->":
             # Register the response and go to the following
             sample_name_num = sample_name + str(num)
-            while sample_name_num in list(res_dict["RESPONSE"].keys()):
+            while sample_name_num in list(res_dict["RESPONSE"][pdf_name].keys()):
                 sample_name_num = sample_name + str(num)
                 num+=1
             VerificationWindow_add.close()
 
             return verif_values_add, sample_name_num, deleted_rows_add
             # If last image
+
+def _process_suggestion(verif_event, verif_values, ANALYSIS_LIST, VerificationWindow, SuggestionW, sugg_index):
+
+        sugg_text = verif_values[verif_event]
+        sugg_text = sugg_text[0] if type(sugg_text) == type([]) else sugg_text
+        client_sugg = sorted([sugg for sugg in ANALYSIS_LIST if sugg_text.lower() in str(sugg).lower()])
+
+        if sugg_text and client_sugg:
+            if SuggestionW :
+                SuggestionW.BringToFront()
+                SuggestionW[("SUGG",)].update(values=client_sugg)
+                SuggestionW.refresh()
+            elif len(sugg_text)>1 :
+                SuggestionW = listSuggestionWindow(client_sugg, VerificationWindow, verif_event)
+                SuggestionW.BringToFront()              
+                                                                    
+        if verif_event[0] == 'SUGG':
+            SuggestionW.close()
+            SuggestionW = False
+            text = verif_values[("SUGG",)][0]
+            VerificationWindow[("ana", sugg_index)].update(value=text)
+
+        return  verif_event, verif_values, VerificationWindow, SuggestionW
+
+def suggestion_interaction(window, verif_event, verif_values, SuggestionW, VerificationWindow, deleted_rows, i_ana, sugg_index, MODEL_ANALYSIS):
+
+# Suggestion
+    if verif_event[0] == "del":
+        deleted_rows.append(verif_event[1])
+        window[("row", verif_event[1])].update(visible=False)
+        window.visibility_changed()
+        window.refresh()
+    
+    if verif_event[0] in ["ana", "SUGG"]:
+
+        if verif_event[0] == "ana":
+            index = verif_event[1]
+            if SuggestionW and sugg_index!=index:
+                SuggestionW.close()
+                SuggestionW=None
+            sugg_index = verif_event[1]
+
+        processed = _process_suggestion(verif_event, verif_values, MODEL_ANALYSIS["Denomination"].dropna().unique(), VerificationWindow, SuggestionW, sugg_index)
+        verif_event, verif_values, VerificationWindow, SuggestionW = processed
+                                            
+    if verif_event[0] == "add":
+        row = create_row(i_ana, "", "")
+        window.extend_layout(window['-COL-'], [row])
+        i_ana+=1
+        window['-COL-'].contents_changed()
+        # window.visibility_changed()
+        window.refresh()
+    
+    return verif_event, deleted_rows, i_ana, sugg_index, SuggestionW
 
 def main():
 
@@ -298,187 +331,178 @@ def main():
         if event == "Lancer l'algorithme":
             givenPath = values["-PATH-"]
             model = [model for model in MODELS if values[model]]
-            if is_valid(givenPath, model):
+            # If everything is valid return the scan dict
+            scan_dict = is_valid(givenPath, model)
+
+            if scan_dict:
+                
                 MODEL = model[0]
-                scan_dict = getAllImages(givenPath)
 
-                if scan_dict == {}:
-                    sg.popup_ok("Aucun PDF n'est trouvé dans le dossier")
+                start = False # Set to true when scans are processed ; condition to start the verification process
+                end = False # Force the verification process to be done or abandonned (no infinit loop)
+                
+                # Set the path to load the res.json file
+                res_path = os.path.join(givenPath, "RES")
+                res_save_path = os.path.join(res_path, "res.json")
 
-                else :
-                    res_path = os.path.join(givenPath, "RES")
-                    save_path_json = os.path.join(res_path, "res.json")
-                    xml_res_path = os.path.join(res_path, "verified_XML")
-                    start = False # Set to true when scans are processed ; condition to start the verification process
-                    end = False # Force the verification process to be done or abandonned (no infinit loop)
-                    if os.path.exists(save_path_json):
-                        continue_or_smash = choice_overwrite_continue_popup("Il semblerait que l'analyse ai déjà été effectuée.\nEcraser la précédente analyse ?"
-                                                                   , "Ecraser", "Reprendre la précédente analyse") #Change conditon
-                    else : continue_or_smash = "overwrite"
+                # Set the path to place the XML, if it's not exist then creat it
+                xml_save_path = LIMSsettings["TOOL_PATH"]["output_folder"] if LIMSsettings["TOOL_PATH"]["output_folder"] else os.path.join(res_path, "verified_XML")
+                if not os.path.exists(xml_save_path):
+                    os.makedirs(xml_save_path)
 
-                    if continue_or_smash==None : pass
-                    if continue_or_smash == "continue":
-                        json_file  = open(save_path_json, encoding='utf-8')
-                        res_dict = json.load(json_file)
-                        welcomWindow.close()
-                        start = True
-
-                        if set(list(res_dict["RESPONSE"].keys())) != set(list(scan_dict.keys())):
-                            sg.popup_ok(f"Attention : Les images précédemment analysées et celles dans le dossier ne sont pas identiques")
-
-                    if continue_or_smash == "overwrite":
-                        sg.popup_auto_close("L'agorithme va démarrer !\nSuivez l'évolution dans le terminal", auto_close_duration=2)
-                        welcomWindow.close()
-                        print("_________ START _________\nAttendez la barre de chargement \nAppuyez sur ctrl+c dans le terminal pour interrompre")
-
-                        scan_dict, res_dict = use_the_tool(givenPath, MODEL)
-
-                        print("_________ DONE _________")
-
-                        with open(save_path_json, 'w', encoding='utf-8') as json_file:
-                            json.dump(res_dict, json_file,  ensure_ascii=False) # Save the extraction json on RES
-                        if os.path.exists(xml_res_path): # Create or overwrite the verified_XML folder in RES
-                            shutil.rmtree(xml_res_path)
-
-                        start = True
-
-                    if not os.path.exists(xml_res_path):
-                        os.makedirs(xml_res_path) 
+                if os.path.exists(res_save_path):
+                    continue_or_smash = choice_overwrite_continue_popup("Il semblerait que l'analyse ai déjà été effectuée.\nEcraser la précédente analyse ?"
+                                                                , "Ecraser", "Reprendre la précédente analyse") #Change conditon
                     
-                    MODEL_ANALYSIS = pd.read_excel(OCR_HELPER["analysis_path"], sheet_name=MODEL)
-                    CLIENT_CONTRACT =  pd.read_excel(r"CONFIG\\client_contract.xlsx")
+                else : continue_or_smash = "overwrite"
 
-                    pdfs_res_dict = res_dict["RESPONSE"]
+                if continue_or_smash==None : pass
+                if continue_or_smash == "continue":
+                    json_file  = open(res_save_path, encoding='utf-8')
+                    res_dict = json.load(json_file)
+                    welcomWindow.close()
+                    start = True
 
-                    SuggestionW = None
+                    if set(list(res_dict["RESPONSE"].keys())) != set(list(scan_dict.keys())):
+                        sg.popup_ok(f"Attention : Les images précédemment analysées et celles dans le dossier ne sont pas identiques")
 
-                    while start and not end:
-                        end = True
+                if continue_or_smash == "overwrite":
+                    sg.popup_auto_close("L'agorithme va démarrer !\nSuivez l'évolution dans le terminal", auto_close_duration=2)
+                    welcomWindow.close()
+                    print("_________ START _________\nAttendez la barre de chargement \nAppuyez sur ctrl+c dans le terminal pour interrompre")
 
-                        n_pdf = 0
-                        n_sample = 0
-                        n_displayed= (-1, -1)
-                        X_dim, Y_dim = fit_the_screen(1)
-                        X_loc, Y_loc = (10,10)
-                        start = False
+                    scan_dict, res_dict = use_the_tool(givenPath, MODEL)
 
-                        sugg_index = None
+                    print("_________ DONE _________")
 
-                        # Last PDF, last sample
-                        n_end = (len(list(pdfs_res_dict.keys()))-1, len(list(pdfs_res_dict[list(pdfs_res_dict.keys())[-1]].keys()))-1)
+                    with open(res_save_path, 'w', encoding='utf-8') as json_file:
+                        json.dump(res_dict, json_file,  ensure_ascii=False) # Save the extraction json on RES
+                    
+                    # Now scan are processed, set start to true
+                    start = True 
 
-                        last_info = None
+                # Set lists to make suggestion on the window
+                MODEL_ANALYSIS = pd.read_excel(OCR_HELPER["analysis_path"], sheet_name=MODEL)
+                CLIENT_CONTRACT =  pd.read_excel(r"CONFIG\\client_contract.xlsx")
 
-                        while n_pdf < n_end[0]+1:
-                            pdf_name, samples_res_dict = list(pdfs_res_dict.items())[n_pdf]
+                pdfs_res_dict = res_dict["RESPONSE"]
 
-                            while n_sample < n_end[1]+1:
-                                sample_name, sample_image_extract = list(samples_res_dict.items())[n_sample]
-                                n_place = (n_pdf, n_sample)
-                                if n_place != n_displayed:
+                SuggestionW = None
 
-                                    if start == True :
-                                        X_loc, Y_loc = VerificationWindow.current_location()
-                                        X_dim, Y_dim = fit_the_screen(10)
-                                        
-                                    image =  get_image(scan_dict, pdf_name, sample_image_extract["IMAGE"])
+                while start and not end:
+                    # The loop started, it could be ended
+                    end = True
+                    start = False
 
-                                    extract_dict = sample_image_extract["EXTRACTION"]
+                    n_pdf = 0
+                    n_sample = 0
+                    n_displayed= (-1, -1)
+                    X_dim, Y_dim = fit_the_screen(1)
+                    X_loc, Y_loc = (10,10)
+                    sugg_index = None
 
-                                    i_ana, VerificactionLayout = getMainLayout(extract_dict, last_info, image, MODEL, X_dim, Y_dim)
+                    # Last PDF
+                    n_pdf_end = len(list(pdfs_res_dict.keys()))
+                    # Last pdf, last sample
+                    last_sample = (n_pdf_end-1, len(list(pdfs_res_dict[list(pdfs_res_dict.keys())[-1]].keys()))-1)
 
-                                    if start == True :
-                                        VerificationWindow.close()
-                                    VerificationWindow = sg.Window(f"PDF {pdf_name} - Commande ({sample_name})", 
-                                                                VerificactionLayout, use_custom_titlebar=True, location=(X_loc, Y_loc), 
-                                                                size=(X_dim, Y_dim), resizable=True, finalize=True)
-                                    n_displayed = n_place
+                    last_info = None
+
+                    while n_pdf < n_pdf_end:
+                        pdf_name, samples_res_dict = list(pdfs_res_dict.items())[n_pdf]
+                        # last sample of the pdf
+                        n_sample_end = len(samples_res_dict.keys())
+                        
+
+                        while n_sample < n_sample_end:
+                            sample_name, sample_image_extract = list(samples_res_dict.items())[n_sample]
+                            n_place = (n_pdf, n_sample)
+                            if n_place != n_displayed:
+
+                                if start == True :
+                                    X_loc, Y_loc = VerificationWindow.current_location()
+                                    X_dim, Y_dim = fit_the_screen(10)
+                                    
+                                image =  get_image(scan_dict, pdf_name, sample_image_extract["IMAGE"])
+
+                                extract_dict = sample_image_extract["EXTRACTION"]
+
+                                i_ana, VerificactionLayout = getMainLayout(extract_dict, last_info, image, MODEL, X_dim, Y_dim)
+
+                                if start == True :
+                                    VerificationWindow.close()
+                                VerificationWindow = sg.Window(f"PDF {pdf_name} - Commande ({sample_name})", 
+                                                            VerificactionLayout, use_custom_titlebar=True, location=(X_loc, Y_loc), 
+                                                            size=(X_dim, Y_dim), resizable=True, finalize=True)
+                                n_displayed = n_place
+                            
+                            start = True
+                            deleted_rows = []
+
+                            while n_place == n_displayed:
+
+                                window, verif_event, verif_values = sg.read_all_windows()
+
+                                # print(verif_event, verif_values)
+
+                                if verif_event == sg.WINDOW_CLOSED:
+                                    return
+
+                                if verif_event == "-consignes-":
+                                    sg.popup_scrolled(GUIsettings["UTILISATION"]["texte"], title="Consignes d'utilisation", size=(50,10))
                                 
-                                start = True
-                                deleted_rows = []
+                                if verif_event[0] in ["ana", "SUGG", "add", "del"]:
+                                    verif_event, deleted_rows, i_ana, sugg_index, SuggestionW = suggestion_interaction(window, verif_event, verif_values, SuggestionW, VerificationWindow, deleted_rows, i_ana, sugg_index, MODEL_ANALYSIS)
 
-                                while n_place == n_displayed:
+                                if verif_event == "Ajouter une commande manuellement":
+                                    # Disable main sugg windows
+                                    VerificationWindow.Disable()
+                                    VerificationWindow.SetAlpha(0.5)
 
-                                    window, verif_event, verif_values = sg.read_all_windows()
+                                    # Generate the add layout
+                                    i_ana_add, VerfifLayout_add = getMainLayout(extract_dict, last_info, image, MODEL, X_dim, Y_dim, add=True)
+                                    loc, dim = (X_loc+30, Y_loc),(X_dim, Y_dim)
 
-                                    # print(verif_event, verif_values)
+                                    verif_values_add, sample_name_add, deleted_rows_add = manually_add_order(VerfifLayout_add, res_dict, i_ana_add, MODEL_ANALYSIS, loc, dim, pdf_name)
 
-                                    if verif_event == sg.WINDOW_CLOSED:
-                                        return
+                                    if verif_values_add:
+                                        res_dict["RESPONSE"][pdf_name][sample_name_add] = deepcopy(res_dict["RESPONSE"][pdf_name][sample_name])
+                                        runningSave(res_dict, res_save_path, verif_values_add, pdf_name, sample_name_add, deleted_rows_add)
+                                    VerificationWindow.Enable()
+                                    VerificationWindow.SetAlpha(1)
 
-                                    if verif_event == "-consignes-":
-                                        sg.popup_scrolled(GUIsettings["UTILISATION"]["texte"], title="Consignes d'utilisation", size=(50,10))
-                                    
-                                    if verif_event[0] == "del":
-                                        deleted_rows.append(verif_event[1])
-                                        window[("row", verif_event[1])].update(visible=False)
-                                        window.visibility_changed()
-                                        window.refresh()
-                                    
-                                    # Suggestion
-                                    if verif_event[0] == "ana" or verif_event == "-SUGG-" :
+                                if verif_event == "<- Retour":
+                                    if n_pdf>0 or n_sample>0:
+                                        runningSave(res_dict, res_save_path, verif_values, pdf_name, sample_name, deleted_rows)
+                                        n_sample-=1
+                                        if n_pdf>0 and n_sample==-1:
+                                            n_pdf-=1
+                                            n_sample = 0
+                                        n_place = (n_pdf, n_sample)                                     
 
-                                        if verif_event[0] == "ana":
-                                            index = verif_event[1]
-                                            if SuggestionW and sugg_index!=index:
-                                                SuggestionW.close()
-                                                SuggestionW=None
-                                            sugg_index = verif_event[1]
+                                if verif_event == "Valider ->":
+                                    if SuggestionW : SuggestionW.close()
+                                    # Not last image
+                                    last_info = verif_values
+                                    if not n_place == last_sample:
+                                        runningSave(res_dict, res_save_path, verif_values, pdf_name, sample_name, deleted_rows)
+                                        n_sample+=1
+                                        n_place = (n_pdf, n_sample)
+                                    # If last image
+                                    else:
+                                        final_dict = runningSave(res_dict, res_save_path, verif_values, pdf_name, sample_name, deleted_rows)
+                                        choice = sg.popup_ok("Il n'y a pas d'image suivante. Finir l'analyse ?", button_color="dark green")
+                                        if choice == "OK":
+                                            finalSaveDict(final_dict["RESPONSE"], xml_save_path, analysis_lims=MODEL_ANALYSIS, model=MODEL, lims_converter=LIMSsettings["LIMS_CONVERTER"],
+                                                            client_contract=CLIENT_CONTRACT)
+                                            json_file.close() # Close the file
+                                            VerificationWindow.close()
+                                            return
 
-                                        processed = process_suggestion(verif_event, verif_values, MODEL_ANALYSIS["Denomination"].dropna().unique(), VerificationWindow, SuggestionW, sugg_index)
-                                        verif_event, verif_values, VerificationWindow, SuggestionW = processed
-                                                                            
-                                    if verif_event == "Ajouter une analyse":
-                                        row = create_row(i_ana, "", "")
-                                        window.extend_layout(window['-COL-'], [row])
-                                        i_ana+=1
-                                        window['-COL-'].contents_changed()
-                                        # window.visibility_changed()
-                                        window.refresh()
+                        n_sample = 0
+                        n_pdf+=1
 
-                                    if verif_event == "Ajouter une commande manuellement":
-                                        VerificationWindow.Disable()
-                                        VerificationWindow.SetAlpha(0.5)
-                                        i_ana, addLayout = getMainLayout(extract_dict, last_info, image, MODEL, X_dim, Y_dim, add=True)
-                                        verif_values_add, sample_name_add, deleted_rows_add = manually_add_order(addLayout, res_dict, X_loc, Y_loc, X_dim, Y_dim)
-                                        if verif_values_add:
-                                            res_dict["RESPONSE"][pdf_name][sample_name_add] = deepcopy(res_dict["RESPONSE"][pdf_name][sample_name])
-                                            runningSave(res_dict, save_path_json, verif_values_add, pdf_name, sample_name_add, deleted_rows_add)
-                                        VerificationWindow.Enable()
-                                        VerificationWindow.SetAlpha(1)
-
-                                    if verif_event == "<- Retour":
-                                        if n_pdf>0 or n_sample>0:
-                                            runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, deleted_rows)
-                                            n_sample-=1
-                                            if n_pdf>0 and n_sample==-1:
-                                                n_pdf-=1
-                                                n_sample = 0
-                                            n_place = (n_pdf, n_sample)                                     
-
-                                    if verif_event == "Valider ->":
-                                        if SuggestionW : SuggestionW.close()
-                                        # Not last image
-                                        last_info = verif_values
-                                        if not n_place == n_end:
-                                            runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, deleted_rows)
-                                            n_sample+=1
-                                            n_place = (n_pdf, n_sample)
-                                        # If last image
-                                        else:
-                                            final_dict = runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, deleted_rows)
-                                            choice = sg.popup_ok("Il n'y a pas d'image suivante. Finir l'analyse ?", button_color="dark green")
-                                            if choice == "OK":
-                                                finalSaveDict(final_dict["RESPONSE"], xml_res_path, analysis_lims=MODEL_ANALYSIS, model=MODEL, lims_converter=LIMSsettings["LIMS_CONVERTER"],
-                                                              client_contract=CLIENT_CONTRACT, out_path=LIMSsettings["TOOL_PATH"]["output_folder"])
-                                                json_file.close() # Close the file
-                                                VerificationWindow.close()
-                                                return
-
-                            n_sample = 0
-                            n_pdf+=1
-
-                VerificationWindow.close()
+                if VerificationWindow :  VerificationWindow.close()
                 if SuggestionW : SuggestionW.close()
     
     welcomWindow.close()               
