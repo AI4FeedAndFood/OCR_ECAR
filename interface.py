@@ -10,18 +10,9 @@ from copy import deepcopy
 from screeninfo import get_monitors
 from PIL import Image
 
-if 'AppData' in sys.executable:
-    application_path = os.getcwd()
-else : 
-    application_path = os.path.dirname(sys.executable)
-
-OCR_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\OCR_config.json")
-OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH))
-
 from LaunchTool import getAllImages, TextCVTool
 from SaveDict import runningSave, finalSaveDict
 
-MODELS = ["CU hors OAIC", "CU OAIC", "Nutriset"]
 
 def is_valid(folderpath, model):
 
@@ -83,28 +74,27 @@ def listSuggestionWindow(sugg_values, mainWindow, verif_event):
         location=(x, y), margins=(0, 0), finalize=True)
 
 def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
-    conversion_dict = LIMSsettings["CLEAN_ZONE"]
+    clean_names_dict = LIMS_HELPER["CLEAN_ZONE_NAMES"]
     conf_threshold = int(GUIsettings["TOOL"]["confidence_threshold"])/100   
     lineLayout = []
     global_field = 1
 
-    # Field that doesn't come from the sheet naturally
-    added_field = ["analyse_specification", "code_produit", "client"]
-    product_codes = {
-        "Blé tendre": "06161",
-        "Blé dur": "05414",
-        "Fourrage orge": "08794",
-        "Orge de brasserie": "05859"}
+    added_field = LIMS_HELPER["ADDED_FIELDS"]
+    product_codes = LIMS_HELPER["PRODUCTCODE_DICT"]
     found_product_code = extract_dict["code_produit"]["sequence"]
+    if found_product_code != "":
+        found_product_code = found_product_code if found_product_code in product_codes.keys() else [pc for pc in product_codes if product_codes[pc]==found_product_code][0]
 
     # Number of detected analysis
     i_ana = 0
     
-    # Add filed to find the contract
+    # # SPECIFIC : Add filed to find the contract
     if "CU" in model:
         lineLayout.append([sg.T("Client :"), sg.Push(), sg.Radio('CU Rouen', "client", default=True, key=("client", "Rouen")), sg.Radio('CU Saint-Nazaire', "client", key=("client", "Saint-Nazaire"), default=False), sg.Push()])
-        pructcode_radio = [sg.Text("Code produit", s=(25,1))] + [sg.Radio(product, "pc", default=(found_product_code in [product, code]), key=("code_produit", code)) for product, code in product_codes.items()]
-        lineLayout.append(pructcode_radio)
+        pructcode_combo = [sg.Text("Code produit", s=(25,1)), sg.Combo(list(product_codes.keys()), default_value=found_product_code,
+            key=("zone", "code_produit"), expand_y=True, expand_x=False, size=(INPUT_LENGTH, 1))]
+        lineLayout.append(pructcode_combo)
+
     # Returned the tool's response for each field
     for zone, landmark_text_dict in extract_dict.items():
         if not zone in added_field: # Field filled by the technicien
@@ -114,13 +104,13 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
                 lineLayout.append([sg.HorizontalSeparator()])
 
             global_field = OCR_HELPER[model][zone]["global_info"]
-            clean_zone_name = conversion_dict[zone]
+            clean_zone_name = clean_names_dict[zone]
             text = f"{clean_zone_name} : "
             sequence = landmark_text_dict["sequence"]
             
             # Propagate global field smaple by sample
             if last_info and not sequence and global_field:
-                sequence = last_info[f"-{zone}-"]
+                sequence = last_info[("zone", zone)]
 
             conf= landmark_text_dict["confidence"] # If empty must not be red
             if conf < conf_threshold or sequence=="":
@@ -225,13 +215,12 @@ def get_image(scan_dict, pdf_name, sample_image_name):
 def welcomeLayout():
 
     welcomeLayout = [
-        [sg.Text("Dossier contenant les PDFs"), sg.Input(LIMSsettings["TOOL_PATH"]["input_folder"], key="-PATH-"), 
+        [sg.Text("Dossier contenant les PDFs"), sg.Input(LIMS_HELPER["TOOL_PATH"]["input_folder"], key="-PATH-"), 
          sg.FolderBrowse(button_color="cornflower blue")],
 
-        [sg.Push(), sg.Text("Client :")] + [sg.Radio(model, group_id="model", key=model) for model in MODELS] + [sg.Push()],
+        [sg.Push(), sg.Text("Client :")] + [sg.Radio(model, group_id="model", key=model) for model in LIMS_HELPER["MODELS"]] + [sg.Push()],
         
         [sg.Push(), sg.Exit(button_color="tomato"), sg.Button("Lancer l'algorithme", button_color="medium sea green"), sg.Push()]
-
     ]
     
     return welcomeLayout
@@ -329,70 +318,68 @@ def main():
             break
 
         if event == "Lancer l'algorithme":
+
             givenPath = values["-PATH-"]
-            model = [model for model in MODELS if values[model]]
+            model = [model for model in LIMS_HELPER["MODELS"] if values[model]]
+
             # If everything is valid return the scan dict
             scan_dict = is_valid(givenPath, model)
 
             if scan_dict:
                 
+                # SPECIFIC
                 MODEL = model[0]
+                interface_model = "CU" if "CU" in MODEL else MODEL
 
-                start = False # Set to true when scans are processed ; condition to start the verification process
-                end = False # Force the verification process to be done or abandonned (no infinit loop)
-                
                 # Set the path to load the res.json file
                 res_path = os.path.join(givenPath, "RES")
                 res_save_path = os.path.join(res_path, "res.json")
 
                 # Set the path to place the XML, if it's not exist then creat it
-                xml_save_path = LIMSsettings["TOOL_PATH"]["output_folder"] if LIMSsettings["TOOL_PATH"]["output_folder"] else os.path.join(res_path, "verified_XML")
+                xml_save_path = LIMS_HELPER["TOOL_PATH"]["output_folder"] if LIMS_HELPER["TOOL_PATH"]["output_folder"] else os.path.join(res_path, "verified_XML")
                 if not os.path.exists(xml_save_path):
                     os.makedirs(xml_save_path)
-
+                
+                # Ask if the tool is going to overwrite the found result of tak eit back
+                continue_or_smash = "overwrite"
                 if os.path.exists(res_save_path):
                     continue_or_smash = choice_overwrite_continue_popup("Il semblerait que l'analyse ai déjà été effectuée.\nEcraser la précédente analyse ?"
                                                                 , "Ecraser", "Reprendre la précédente analyse") #Change conditon
-                    
-                else : continue_or_smash = "overwrite"
 
-                if continue_or_smash==None : pass
+                # If the tool take last results back
                 if continue_or_smash == "continue":
                     json_file  = open(res_save_path, encoding='utf-8')
                     res_dict = json.load(json_file)
                     welcomWindow.close()
-                    start = True
-
                     if set(list(res_dict["RESPONSE"].keys())) != set(list(scan_dict.keys())):
                         sg.popup_ok(f"Attention : Les images précédemment analysées et celles dans le dossier ne sont pas identiques")
-
+                
+                # If the tool have to launch the extraction process
                 if continue_or_smash == "overwrite":
                     sg.popup_auto_close("L'agorithme va démarrer !\nSuivez l'évolution dans le terminal", auto_close_duration=2)
                     welcomWindow.close()
+
                     print("_________ START _________\nAttendez la barre de chargement \nAppuyez sur ctrl+c dans le terminal pour interrompre")
-
                     scan_dict, res_dict = use_the_tool(givenPath, MODEL)
-
                     print("_________ DONE _________")
 
+                    # Save the extraction json on RES
                     with open(res_save_path, 'w', encoding='utf-8') as json_file:
-                        json.dump(res_dict, json_file,  ensure_ascii=False) # Save the extraction json on RES
-                    
-                    # Now scan are processed, set start to true
-                    start = True 
+                        json.dump(res_dict, json_file,  ensure_ascii=False)
+    
 
                 # Set lists to make suggestion on the window
-                MODEL_ANALYSIS = pd.read_excel(OCR_HELPER["analysis_path"], sheet_name=MODEL)
-                CLIENT_CONTRACT =  pd.read_excel(r"CONFIG\\client_contract.xlsx")
+                MODEL_ANALYSIS = pd.read_excel(OCR_HELPER["PATHES"]["contract_analysis_path"], sheet_name="analyse "+MODEL)
 
                 pdfs_res_dict = res_dict["RESPONSE"]
 
                 SuggestionW = None
 
-                while start and not end:
-                    # The loop started, it could be ended
-                    end = True
-                    start = False
+                is_loop_started = False # Force the verification process to be done or abandonned (no infinit loop)
+
+                while not is_loop_started:
+                    is_loop_started = True 
+                    is_first_step = True
 
                     n_pdf = 0
                     n_sample = 0
@@ -416,27 +403,30 @@ def main():
 
                         while n_sample < n_sample_end:
                             sample_name, sample_image_extract = list(samples_res_dict.items())[n_sample]
+                            # Identify the current sample
                             n_place = (n_pdf, n_sample)
-                            if n_place != n_displayed:
 
-                                if start == True :
+                            # If new displayed sample is aked
+                            if n_place != n_displayed:
+                                
+                                # Close the window if a new one is going to be display
+                                if is_first_step == False :
                                     X_loc, Y_loc = VerificationWindow.current_location()
                                     X_dim, Y_dim = fit_the_screen(10)
-                                    
-                                image =  get_image(scan_dict, pdf_name, sample_image_extract["IMAGE"])
-
-                                extract_dict = sample_image_extract["EXTRACTION"]
-
-                                i_ana, VerificactionLayout = getMainLayout(extract_dict, last_info, image, MODEL, X_dim, Y_dim)
-
-                                if start == True :
                                     VerificationWindow.close()
+                                
+                                # Get all information to display
+                                image =  get_image(scan_dict, pdf_name, sample_image_extract["IMAGE"])
+                                extract_dict = sample_image_extract["EXTRACTION"]
+                                # Create the new window
+                                i_ana, VerificactionLayout = getMainLayout(extract_dict, last_info, image, interface_model, X_dim, Y_dim)
                                 VerificationWindow = sg.Window(f"PDF {pdf_name} - Commande ({sample_name})", 
                                                             VerificactionLayout, use_custom_titlebar=True, location=(X_loc, Y_loc), 
                                                             size=(X_dim, Y_dim), resizable=True, finalize=True)
+                                # Set displayed sample index
                                 n_displayed = n_place
                             
-                            start = True
+                            is_first_step = False
                             deleted_rows = []
 
                             while n_place == n_displayed:
@@ -451,6 +441,7 @@ def main():
                                 if verif_event == "-consignes-":
                                     sg.popup_scrolled(GUIsettings["UTILISATION"]["texte"], title="Consignes d'utilisation", size=(50,10))
                                 
+                                # Analysis case
                                 if verif_event[0] in ["ana", "SUGG", "add", "del"]:
                                     verif_event, deleted_rows, i_ana, sugg_index, SuggestionW = suggestion_interaction(window, verif_event, verif_values, SuggestionW, VerificationWindow, deleted_rows, i_ana, sugg_index, MODEL_ANALYSIS)
 
@@ -460,7 +451,7 @@ def main():
                                     VerificationWindow.SetAlpha(0.5)
 
                                     # Generate the add layout
-                                    i_ana_add, VerfifLayout_add = getMainLayout(extract_dict, last_info, image, MODEL, X_dim, Y_dim, add=True)
+                                    i_ana_add, VerfifLayout_add = getMainLayout(extract_dict, last_info, image, interface_model, X_dim, Y_dim, add=True)
                                     loc, dim = (X_loc+30, Y_loc),(X_dim, Y_dim)
 
                                     verif_values_add, sample_name_add, deleted_rows_add = manually_add_order(VerfifLayout_add, res_dict, i_ana_add, MODEL_ANALYSIS, loc, dim, pdf_name)
@@ -471,15 +462,20 @@ def main():
                                     VerificationWindow.Enable()
                                     VerificationWindow.SetAlpha(1)
 
+                                # Return to the past sample
                                 if verif_event == "<- Retour":
+                                    # Can go before the firt sample
                                     if n_pdf>0 or n_sample>0:
                                         runningSave(res_dict, res_save_path, verif_values, pdf_name, sample_name, deleted_rows)
+                                        # Go to the past sample
                                         n_sample-=1
+                                        # If it's from the past pdf change the pdf number
                                         if n_pdf>0 and n_sample==-1:
                                             n_pdf-=1
                                             n_sample = 0
-                                        n_place = (n_pdf, n_sample)                                     
-
+                                        n_place = (n_pdf, n_sample)                                         
+                                
+                                # Go to next
                                 if verif_event == "Valider ->":
                                     if SuggestionW : SuggestionW.close()
                                     # Not last image
@@ -493,12 +489,13 @@ def main():
                                         final_dict = runningSave(res_dict, res_save_path, verif_values, pdf_name, sample_name, deleted_rows)
                                         choice = sg.popup_ok("Il n'y a pas d'image suivante. Finir l'analyse ?", button_color="dark green")
                                         if choice == "OK":
-                                            finalSaveDict(final_dict["RESPONSE"], xml_save_path, analysis_lims=MODEL_ANALYSIS, model=MODEL, lims_converter=LIMSsettings["LIMS_CONVERTER"],
+                                            finalSaveDict(final_dict["RESPONSE"], xml_save_path, analysis_lims=MODEL_ANALYSIS, model=MODEL, lims_helper=LIMS_HELPER,
                                                             client_contract=CLIENT_CONTRACT)
                                             json_file.close() # Close the file
                                             VerificationWindow.close()
                                             return
-
+                        
+                        # If n_sample exceed the n_sample_end, go to the next one from the folowing pdf
                         n_sample = 0
                         n_pdf+=1
 
@@ -508,20 +505,34 @@ def main():
     welcomWindow.close()               
                          
 if __name__ == "__main__":
+
     print("Attendez quelques instants, une page va s'ouvrir")
     
-    SETTINGS_PATH = os.getcwd()
-    GUIsettings = sg.UserSettings(path=os.path.join(SETTINGS_PATH, "CONFIG"), filename="GUI_config.ini", use_config_file=True, convert_bools_and_none=True)
+    # Get the base path if executable or launch directly
+    if 'AppData' in sys.executable:
+        application_path = os.getcwd()
+
+    else : 
+        application_path = os.path.dirname(sys.executable)
+
+    # Load helper
+    OCR_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\OCR_CONFIG.json")
+    OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH))
+
+    LIMS_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\LIMS_CONFIG.json")
+    LIMS_HELPER= json.load(open(LIMS_HELPER_JSON_PATH))
+
+    CLIENT_CONTRACT = pd.read_excel(os.path.join(application_path, OCR_HELPER["PATHES"]["contract_analysis_path"]), sheet_name='client_contract')
+    
+    # Set interface's graphical settings
+    GUIsettings = sg.UserSettings(path=os.path.join(application_path, "CONFIG"), filename="GUI_CONFIG.ini", use_config_file=True, convert_bools_and_none=True)
+
     theme = GUIsettings["GUI"]["theme"]
     font_family = GUIsettings["GUI"]["font_family"]
     font_size = int(GUIsettings["GUI"]["font_size"])
     help_text = GUIsettings["UTILISATION"]["text"]    
     sg.theme(theme)
     sg.set_options(font=(font_family, font_size))
-    
-    # sys.path.append(r"CONFIG")
-    OCR_HELPER = json.load(open(r"CONFIG\OCR_config.json"))
-    LIMSsettings = json.load(open(r"CONFIG\LIMS_config.json"))
     INPUT_LENGTH = 45
 
     main()

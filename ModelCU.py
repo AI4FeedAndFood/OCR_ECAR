@@ -18,10 +18,10 @@ year = datetime.now().year
 from paddleocr import PaddleOCR
 
 from JaroDistance import jaro_distance
-from ProcessPDF import  binarized_image, get_adjusted_image, get_checkboxes, get_iou
+from ProcessPDF import  binarized_image, get_checkboxes, get_iou
 from ConditionFilter import condition_filter
 
-MODEL = "CU OAIC"
+MODEL = "CU"
 
 if 'AppData' in sys.executable:
     application_path = os.getcwd()
@@ -31,9 +31,9 @@ else :
 OCR_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\OCR_config.json")
 OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH, encoding="utf-8"))
 MODEL_HELPER = OCR_HELPER[MODEL]
+OCR_PATHES = OCR_HELPER["PATHES"]
 
-CHECK_PATH = os.path.join(application_path, OCR_HELPER["checkboxes_path"][MODEL])
-ANALYSIS_PATH = os.path.join(application_path, OCR_HELPER["analysis_path"])
+CHECK_PATH = os.path.join(application_path, OCR_PATHES["checkboxes_path"][MODEL])
 
 NULL_OCR = {"text" : "",
             "box" : [],
@@ -272,8 +272,7 @@ def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELP
 
         # print(zone, " : ", candidate_dicts)
 
-        match_indices, res_seq = condition_filter(candidate_dicts, condition, model, path=ANALYSIS_PATH, checkboxes=checkboxes)
-
+        match_indices, res_seq = condition_filter(candidate_dicts, condition, model, application_path, ocr_pathes=OCR_PATHES, checkboxes=checkboxes)
         if len(res_seq)!=0:
             if type(res_seq[0]) != type([]):
                 res_seq = unidecode(" ".join(res_seq))
@@ -303,7 +302,7 @@ def model_particularities(zone_matches):
     zone_matches["scelles"]["sequence"] = "" if jaro_distance(zone_matches["scelles"]["sequence"].lower(), "autres")>0.90 else zone_matches["scelles"]["sequence"]
 
     # Select a product Code
-    product_code_dict = ["Blé tendre", "Blé dur", "Fourrage orge", "Orge de brasserie"]
+    product_code_dict = ["Ble tendre", "Ble dur", "Fourrage orge", "Orge de brasserie"]
 
     marchandise = zone_matches["marchandise"]["sequence"]
     product_code = ""
@@ -368,7 +367,7 @@ def main(scan_dict, model=MODEL):
 
 if __name__ == "__main__":
 
-    path = r"C:\Users\CF6P\Desktop\ECAR\Data\test\Control union Rouen.pdf"
+    path = r"C:\Users\CF6P\Desktop\ECAR\Data\CU\OAIC\CU OAIC.pdf"
 
     from ProcessPDF import PDF_to_images
     import os

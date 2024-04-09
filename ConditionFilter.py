@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
  
 import re
+import os
 
 from copy import deepcopy
 from JaroDistance import jaro_distance
@@ -9,6 +10,27 @@ from unidecode import unidecode
 
 from datetime import datetime
 year = datetime.now().year
+
+def _get_sheet(path, condition_dict, model):
+
+    if not "sheet_name" in condition_dict.keys():
+        print(0)
+        df = pd.read_excel(path)
+    
+    else:
+        sheet_name = condition_dict["sheet_name"]
+
+        xl = pd.ExcelFile(path)
+        sheet_names = xl.sheet_names  # see all sheet names
+
+        if sheet_name in sheet_names:
+            df = xl.parse(sheet_name)
+        elif sheet_name+" "+model in sheet_names:
+            df = xl.parse(sheet_name+" "+model)
+        else :
+            df = pd.read_excel(path)
+
+    return df
 
 def list_process(candidates, condition_dict, lists_df, min_jaro = 0.87):
     """ Search candidates that contains all the word from a list of word/sequence, with a word by word 'min_jaro' tolerance"
@@ -123,11 +145,10 @@ def after_key_process(candidates, bound_keys, similarity=0.85):
         return res_index, full_seq
     
     strip = '().*:‘;,§"'+"'"
-    ref = {0:"start", 1:"end"}
-    key_boundaries = {"start" : [], "end" : []} 
+    key_boundaries = {"after" : [], "before" : []} 
 
     # Get the all matched between keys and sequences for the start and the end key
-    for state, bound_key in enumerate(bound_keys):
+    for state, bound_key in bound_keys.items():
         if bound_key ==  "":
             continue
         bound_word = bound_key.split(" ")
@@ -141,15 +162,15 @@ def after_key_process(candidates, bound_keys, similarity=0.85):
                         # If the rwo words are close
                         if (jaro_distance(key_word, unidecode(word).strip(strip))>similarity):
                             word_match["i_key"],  word_match["i_candidate"], word_match["i_word"] = i_key, i_candidate, i_word
-                            key_boundaries[ref[state]].append(word_match)
+                            key_boundaries[state].append(word_match)
                             break
                         # If a sequence word is containing a key_word
                         if len(key_word)>2 and key_word in word:
                             word_match["i_key"],  word_match["i_candidate"], word_match["i_word"] = i_key, i_candidate, i_word
-                            key_boundaries[ref[state]].append(word_match)
+                            key_boundaries[state].append(word_match)
                             break
     
-    if key_boundaries["start"] == [] :
+    if key_boundaries["after"] == [] :
         if len(candidates)==1:
             print("DEFAULT CASE :", candidates[0]["text"])
             return [0], candidates[0]["text"]
@@ -160,17 +181,17 @@ def after_key_process(candidates, bound_keys, similarity=0.85):
                                                 key=lambda match : ([d["i_candidate"] for d in match_list].count(match["i_candidate"]), -match["i_candidate"]), 
                                                                     reverse=True) # Most matched sentence, the firt one in case of tie
    
-    last_start_match = sorted(_order_by_match_candidate(key_boundaries["start"]), key=lambda d:d["i_key"], reverse=True)[0]
+    last_start_match = sorted(_order_by_match_candidate(key_boundaries["after"]), key=lambda d:d["i_key"], reverse=True)[0]
 
     if last_start_match["i_word"] == len(candidates[last_start_match["i_candidate"]]["text"])-1:
         if last_start_match["i_candidate"] == len(candidates)-1:
             return [], []
         last_start_match["i_candidate"], last_start_match["i_word"] = last_start_match["i_candidate"]+1, 0
 
-    if key_boundaries["end"]==[]:
+    if key_boundaries["before"]==[]:
         first_end_seq_id = deepcopy(last_start_match) # Equivalent to a mis match : Will be changed in the next step
     else:
-        first_end_seq_id = sorted(_order_by_match_candidate(key_boundaries["end"]), key=lambda d:d["i_key"], reverse=False)[0]
+        first_end_seq_id = sorted(_order_by_match_candidate(key_boundaries["before"]), key=lambda d:d["i_key"], reverse=False)[0]
         # Empty field case
         if (first_end_seq_id["i_candidate"], first_end_seq_id["i_word"]) == (last_start_match["i_candidate"], last_start_match["i_word"]):
             return [],  []
@@ -187,8 +208,8 @@ def after_key_process(candidates, bound_keys, similarity=0.85):
     all_text = [word for text_candidate in text_candidates for word in text_candidate]
     all_local_indices = [i for i,text in enumerate(text_candidates) for s in range(len(text))]
 
-    search_range = (len(bound_keys[0]) - last_start_match["i_key"]) # 0> if the last detected word is not the last key word 
-    target_words = [bound_keys[0].split(" ")[-1]] + ["(*):"]
+    search_range = (len(bound_keys["after"]) - last_start_match["i_key"]) # 0> if the last detected word is not the last key word 
+    target_words = [bound_keys["after"].split(" ")[-1]] + ["(*):"]
     
     line_index, res_seq = _get_wanted_seq(all_text, target_words, search_range)
 
@@ -324,7 +345,7 @@ def check_process(candidates, sense, checkboxes, lists_df, list_condition_dict):
                     min_dist = dist
                     nearest_candidate, n_index = candidate, i_cand
 
-        if nearest_candidate:
+        if nearest_candidate and list_condition_dict:
 
             _, res_seq = list_process([nearest_candidate], list_condition_dict, lists_df)
 
@@ -334,7 +355,7 @@ def check_process(candidates, sense, checkboxes, lists_df, list_condition_dict):
 
     return candidates_indices, check_candidates
 
-def condition_filter(candidates_dicts, condition, model, path, checkboxes=None):
+def condition_filter(candidates_dicts, condition, model, application_path, ocr_pathes, checkboxes=None):
     """_summary_
 
     Args:
@@ -362,21 +383,33 @@ def condition_filter(candidates_dicts, condition, model, path, checkboxes=None):
         match_indices, res_seq = date_process(candidates, strip)
 
     if condition[0] == "list": # In this case itertion is over element in the condition list
-        lists_df = pd.read_excel(path, sheet_name=model)
         condition_dict = condition[1]
+        path = os.path.join(application_path, ocr_pathes[condition_dict["path"]])
+
+        lists_df = _get_sheet(path, list_condition_dict, model)
+        
         match_indices, res_seq= list_process(candidates, condition_dict, lists_df)
 
     if condition[0] == "format": # In this case itertion is over element in the condition list
         keys = condition[1]
-        match_indices, res_seq = format_process(candidates, keys)
+        match_indices, res_seq = format_process(candidates, keys, model)
     
     if condition[0] == "constant":
         match_indices, res_seq = [], [condition[1]]
     
     if condition[0] == "checkbox":
+        # The sens where to extract sentences starting from the checkboxe
         sense = condition[1]
-        list_condition_dict = condition[2]
-        lists_df = pd.read_excel(path, sheet_name=model)
+        # If a list could help to find the sentence
+        try:
+            list_condition_dict = condition[2]
+            # if the list file is global        
+            path = os.path.join(application_path, ocr_pathes[list_condition_dict["path"]])
+            lists_df = _get_sheet(path, list_condition_dict, model)
+
+        except:    
+            list_condition_dict, lists_df = None, None
+
         match_indices, res_seq = check_process(candidates, sense, checkboxes, lists_df, list_condition_dict)
             
     return match_indices, res_seq

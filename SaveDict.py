@@ -27,7 +27,6 @@ def _get_dict_value(dict, keys_path):
 def runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, deleted_rows):
 
     analyses, comments = [], []
-
     for key, items in verif_values.items():
         # Analysis case
         if key[0] == "ana":
@@ -43,11 +42,6 @@ def runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, d
             if items:
                 res_dict["RESPONSE"][pdf_name][sample_name]["EXTRACTION"][key[0]] = key[1]
 
-        # Product Code case
-        elif key[0] == "code_produit":
-            if items:
-                res_dict["RESPONSE"][pdf_name][sample_name]["EXTRACTION"][key[0]]["sequence"] = key[1]
-
         # Other cases
         elif key[0] == "zone":
                 res_dict["RESPONSE"][pdf_name][sample_name]["EXTRACTION"][key[1]]["sequence"] = items
@@ -61,7 +55,7 @@ def runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, d
     
     return res_dict
 
-def keepNeededFields(verified_dict, client_contract, model):
+def keepNeededFields(verified_dict, client_contract, model, productcode_dict):
     """Extract fields to return to the lims from the interface
 
     Args:
@@ -79,8 +73,8 @@ def keepNeededFields(verified_dict, client_contract, model):
             sample_clean_dict[key] = value["sequence"]
 
     # Add the code_produit
-    if "code_produit" in sample_clean_dict.keys():
-        sample_clean_dict["code_produit"] = verified_dict["code_produit"]["sequence"].split(": ")[1] if verified_dict["code_produit"]["sequence"] else ""
+    if "code_produit" in verified_dict.keys():
+        sample_clean_dict["code_produit"] = productcode_dict[verified_dict["code_produit"]["sequence"]] if verified_dict["code_produit"]["sequence"] else ""
 
     # Find the Contract and the quotation according to the data
     client = verified_dict["client"]
@@ -134,9 +128,9 @@ def convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims):
                     related_test.append(test[0])
 
         # All tests that depend on several tests
-        all_related = related_code_lims[related_code_lims["Related"].str.contains("ALL")]
+        all_related = deepcopy(related_code_lims[related_code_lims["Related"].str.contains("ALL")])
         if len(all_related)>0:
-            all_related.loc[:,["Related"]] =  deepcopy(all_related["Related"]).apply(lambda x: x.split(": ")[1].split(" "))
+            all_related["Related"] =  all_related["Related"].apply(lambda x: x.split(": ")[1].split(" "))
 
         for ind in all_related.index:
             if set(all_related["Related"][ind]).issubset(set(all_codes)):
@@ -224,7 +218,7 @@ def arrangeForClientSpecificites(stacked_samples_dict, analysis_lims, model):
 
     return stacked_samples_dict
 
-def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.PurchaseOrderReference"):
+def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.ContractCode"):
     
     def _merge_bool(merged_dict, sample_dict, merge_condition):
         # 
@@ -238,8 +232,7 @@ def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.PurchaseOrder
     for sample_dict in stacked_samples_dict:
         merged = False
         for i_dict, merged_dict in enumerate(stacked_merged_dict):
-
-            # Merge samples by common 
+            # Merge samples by common
             if _merge_bool(merged_dict, sample_dict, merge_condition):
                 new_number = len(_get_dict_value(merged_dict, "Order.Samples"))
                 # Store to clean the xml after the conversion
@@ -248,12 +241,13 @@ def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.PurchaseOrder
                 new_path = f"Order.Samples.Sample_"+str(new_number)
                 _update_dict(stacked_merged_dict[i_dict], _get_dict_value(sample_dict, "Order.Samples.Sample"), new_path)
                 merged = True
+
         if not merged:
             stacked_merged_dict.append(sample_dict)
 
     return stacked_merged_dict, added_number
 
-def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_converter, client_contract, xml_name="verified_XML"):
+def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_helper, client_contract, xml_name="verified_XML"):
 
     def _rename_sample(xml, added_number):
         xml = xml.decode("UTF-8")
@@ -263,22 +257,21 @@ def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_conv
                 xml = xml.replace(f'</Sample_{number}>', '</Sample>')
         xml = xml.encode("UTF-8")
         return xml
-
     # For all sample to extract from pdfs, keep only relevant fields
     stacked_samples_dict = []
     for pdf_name, sample_dict in verified_dict.items():
         for sample, res_dict in sample_dict.items():
             xml_name = datetime.now().strftime("%Y%m%d%H")
-            sample_XML_dict = keepNeededFields(res_dict["EXTRACTION"], client_contract, model)
+            sample_XML_dict = keepNeededFields(res_dict["EXTRACTION"], client_contract, model, lims_helper["PRODUCTCODE_DICT"])
             stacked_samples_dict.append(sample_XML_dict)
 
     # For all extracted dict, arrage them according to the client/labs needs
-    # stacked_samples_dict = arrangeForClientSpecificites(stacked_samples_dict, analysis_lims, model)
+    stacked_samples_dict = arrangeForClientSpecificites(stacked_samples_dict, analysis_lims, model)
 
     # Convert samples dict to the XML format
-    xmls_format_dict = convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims)
+    xmls_format_dict = convertDictToLIMS(stacked_samples_dict, lims_helper["LIMS_CONVERTER"], analysis_lims)
 
-    xmls_merged_dict, added_number = mergeOrderSamples(xmls_format_dict)
+    xmls_merged_dict, added_number = mergeOrderSamples(xmls_format_dict, merge_condition=lims_helper["SAMPLE_MERGER"])
     
     #######
 
@@ -304,17 +297,13 @@ def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_conv
 if __name__ == "__main__":
     import pandas as pd
 
-    verified_dict = {'Control2': {'sample_0': {'IMAGE': 'image_0', 'EXTRACTION': {'reference': {'sequence': 'REF1', 'confidence': 0.0, 'area': [1240, 0, 2480, 1052]}, 'navire': {'sequence': 'M/V - SINCERE', 'confidence': 0.989, 'area': [95, 403, 1720, 534]}, 'marchandise': {'sequence': 'BLE TENDRE', 'confidence': 0.998, 'area': [136, 472, 1568, 576]}, 'quantite': {'sequence': '27400,000 MT', 'confidence': 0.999, 'area': [228, 516, 1411, 647]}, 'vendeur': {'sequence': 'VITERRA BV', 'confidence': 1.0, 'area': [1358, 534, 2448, 638]}, 'date': {'sequence': '09/02/2024', 'confidence': 1.0, 'area': [255, 575, 1342, 706]}, 'port': {'sequence': 'CHORNOMORSK / UKRAINE', 'confidence': 0.988, 'area': [1047, 412, 2480, 536]}, 'destination': {'sequence': 'TUNISE', 'confidence': 1.0, 'area': [1263, 479, 2480, 583]}, 'acheteur': {'sequence': 'OFFICE DES CEREALES', 'confidence': 0.999, 'area': [1343, 593, 2480, 697]}, 'scelles': {'sequence': '3942668', 'confidence': 0.999, 'area': [1324, 757, 2480, 888]}, 'analyse': {'sequence': ['Poids spécifique ', 'Pesticides (Pack) CODEX Autres', 'Deltaméthrin',  'Cyanures'], 'confidence': 0.941, 'area': [0, 701, 2480, 3508]}, 'code_produit': {'sequence': '06161: Blé tendre', 'confidence': 0.998, 'area': [136, 472, 1568, 576]}, 'client': 'Rouen'}}, 'sample_1': {'IMAGE': 'image_1', 'EXTRACTION': {'reference': {'sequence': 'REF2', 'confidence': 0.0, 'area': [1240, 0, 2480, 1052]}, 'navire': {'sequence': 'M/V - ARKLOW WIND', 'confidence': 0.985, 'area': 
-                [16, 306, 1766, 447]}, 'marchandise': {'sequence': 'BLE TENDRE', 'confidence': 0.988, 'area': [61, 377, 1607, 498]}, 'quantite': {'sequence': '15 080 MT 000', 'confidence': 1.0, 'area': [164, 428, 1406, 562]}, 'vendeur': {'sequence': 'AGRIAL', 'confidence': 1.0, 'area': [1341, 450, 2480, 554]}, 'date': {'sequence': '06/02/2024', 'confidence': 1.0, 'area': [184, 487, 1367, 618]}, 'port': {'sequence': 'CAEN', 'confidence': 1.0, 'area': 
-                [1014, 317, 2480, 458]}, 'destination': {'sequence': 'UK', 'confidence': 1.0, 'area': [1246, 392, 2480, 496]}, 'acheteur': {'sequence': '', 'confidence': 0.0, 'area': [0, 70, 2480, 1052]}, 'scelles': {'sequence': 'AUTRES', 'confidence': 0.998, 'area': [1370, 498, 2480, 629]}, 'analyse': {'sequence': ['Humidité uniquement (AA07A)', 'Impuretés ISO15587 (QF04M)', 'Insectes vivants QF045', 'Insectes mort QF044', 'Zéaralénone immuno', 'Deltaméthrin'], 'confidence': 0.519, 'area': [0, 701, 2480, 3508]}, 'code_produit': {'sequence': '06161: Blé tendre', 'confidence': 0.988, 'area': [61, 377, 1607, 498]}, 'client': 'Rouen'}}}}
-
+    verified_dict = {}
     OCR_HELPER = json.load(open("CONFIG\OCR_config.json"))
 
-
-    client_contract =  pd.read_excel(r"CONFIG\\client_contract.xlsx")
+    client_contract =  pd.read_excel(r"CONFIG\\eLIMS_contract_analysis.xlsx")
     xml_save_path = r"C:\Users\CF6P\Desktop\ECAR\Data\debug"
-    model = "CU hors OAIC"
-    analysis_lims = pd.read_excel(OCR_HELPER["analysis_path"], sheet_name=model)
-    lims_converter =  json.load(open("CONFIG\LIMS_CONFIG.json"))["LIMS_CONVERTER"]
+    model = "CU OAIC"
+    analysis_lims = pd.read_excel(OCR_HELPER["PATHES"]["contract_analysis_path"], sheet_name="analyse"+" "+model)
+    lims_converter =  json.load(open("CONFIG\LIMS_CONFIG.json"))
 
     finalSaveDict(verified_dict, xml_save_path, analysis_lims, model, lims_converter, client_contract, xml_name="verified_XML")

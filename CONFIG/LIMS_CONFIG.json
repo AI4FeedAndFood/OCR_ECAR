@@ -1,10 +1,23 @@
 {
     "TOOL_PATH" : {
         "input_folder" : "C:\\Users\\CF6P\\Desktop\\ECAR\\Data\\CU\\OAIC",
-        "output_folder" : "\\\\itiz-ft-fr.local\\AAG010\\Shared\\B2BPreprod\\Orders\\Eurofins_OCR_Tool"
+        "output_folder" : "",
+        "copy_folder" : ""
     },
+
+    "MODELS" : ["CU OAIC", "CU hors OAIC", "Nutriset"],
+
+    "ADDED_FIELDS" : ["analyse_specification", "code_produit", "client"],
+
+    "SAMPLE_MERGER" : "Order.Comment",
+
+    "PRODUCTCODE_DICT" : {
+        "Ble tendre": "06161",
+        "Ble dur": "05414",
+        "Fourrage orge": "08794",
+        "Orge de brasserie": "05859"},
     
-    "CLEAN_ZONE" : {
+    "CLEAN_ZONE_NAMES" : {
         "client" : "Client",
         "reference" : "Reference",
         "navire" : "Nom du navire",

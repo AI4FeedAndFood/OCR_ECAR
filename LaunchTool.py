@@ -5,13 +5,6 @@ import numpy as np
 import cv2
 import pandas as pd
 
-OCR_HELPER_JSON_PATH  = r"CONFIG\OCR_config.json"
-OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH))
-
-whitelist =  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz(),:.-/°&=àéçëôùê''"
-LANG = 'eng+eng2'
-TESSCONFIG = [1, 6, whitelist, LANG]
-
 from ProcessPDF import PDF_to_images
 
 def getAllImages(path):

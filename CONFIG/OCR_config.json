@@ -1,9 +1,12 @@
 {   
-    "checkboxes_path":{
-        "CU OAIC" : "CONFIG\\checks"
-    },
+    "PATHES" : {
+        "checkboxes_path":{
+            "CU" : "CONFIG\\checks"
+        },
 
-    "analysis_path": "CONFIG\\analyses.xlsx",
+        "contract_analysis_path": "CONFIG\\eLIMS_contract_analysis.xlsx"
+
+        },
 
     "Nutriset": {
         "client" : {
@@ -95,7 +98,7 @@
             "subregion" : [[0.4, 1], [0, 0.6]],
             "key_sentences" : ["Analyse à réaliser"],
             "relative_position" : [[1,16], [-1,1.5]],
-            "conditions" : ["list", {"column" :"Denomination", "mode":"multiple"}]
+            "conditions" : ["list", {"path":"analysis_path", "sheet_name" : "analyse", "column" :"Denomination", "mode":"multiple"}]
         },
         "specifications" : {
             "global_info" : 1,
@@ -106,7 +109,7 @@
         }
     },
     
-    "CU OAIC" : {
+    "CU" : {
         "reference" : {
             "global_info" : 0,
             "subregion" : {
@@ -122,7 +125,7 @@
                 "x_min" : 0,
                 "x_max" : 20
             },     
-            "conditions" : ["after_key", ["REF", ""]]
+            "conditions" : ["after_key", {"after": "REF", "before":""}]
         },
         "navire" : {
             "global_info" : 0,
@@ -139,7 +142,7 @@
                 "x_min" : 0,
                 "x_max" : 3
             },
-            "conditions" : ["after_key", ["NOM DU NAVIRE", ""]]
+            "conditions" : ["after_key", {"after":"NOM DU NAVIRE", "before":""}]
         },
         "marchandise" : {
             "global_info" : 0,
@@ -156,7 +159,7 @@
                 "x_min" : 0,
                 "x_max" : 3
             },
-            "conditions" : ["after_key", ["MARCHANDISE", ""]]
+            "conditions" : ["after_key", {"after":"MARCHANDISE", "before":""}]
         },
         "quantite" : {
             "global_info" : 0,
@@ -173,7 +176,7 @@
                 "x_min" : 0,
                 "x_max" : 3.5
             },
-            "conditions" : ["after_key", ["QUANTITE", ""]]
+            "conditions" : ["after_key", {"after" : "QUANTITE", "before" : ""}]
         },
         "vendeur" : {
             "global_info" : 0,
@@ -190,7 +193,7 @@
                 "x_min" : 0,
                 "x_max" : 3.5
             },
-            "conditions" : ["after_key", ["VENDEUR", ""]]
+            "conditions" : ["after_key", {"after" : "VENDEUR", "before" : ""}]
         },
         "date" : {
             "global_info" : 0,
@@ -224,7 +227,7 @@
                 "x_min" : 0,
                 "x_max" : 3.5
             },
-            "conditions" : ["after_key", ["PORT DE CHARGEMENT", ""]]
+            "conditions" : ["after_key", {"after":"PORT DE CHARGEMENT", "before":""}]
         },
         "destination" : {
             "global_info" : 0,
@@ -241,7 +244,7 @@
                 "x_min" : 0,
                 "x_max" : 3.5
             },
-            "conditions" : ["after_key", ["DESTINATION", ""]]
+            "conditions" : ["after_key", {"after":"DESTINATION", "before":""}]
         },
         "acheteur" : {
             "global_info" : 0,
@@ -258,7 +261,7 @@
                 "x_min" : 0,
                 "x_max" : 3.5
             },
-            "conditions" : ["after_key", ["ACHETEUR", ""]]
+            "conditions" : ["after_key", {"after":"ACHETEUR", "before":""}]
         },
         "scelles" : {
             "global_info" : 0,
@@ -275,7 +278,7 @@
                 "x_min" : 0,
                 "x_max" : 4.5
             },
-            "conditions" : ["after_key", ["SCELLES", ""]]
+            "conditions" : ["after_key", {"after":"SCELLES", "before":""}]
         },
         "analyse" : {
             "global_info" : 0,
@@ -292,197 +295,7 @@
                 "x_min" : 0,
                 "x_max" : 300
             },
-            "conditions" : ["checkbox", "left",  {"column" :"Denomination", "mode":"single"}]
-        }
-    },
-
-    "CU hors OAIC" : {
-        "reference" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0,
-                "frac_y_max" : 0.3,
-                "frac_x_min" : 0.5,
-                "frac_x_max" : 1
-            },         
-            "key_sentences" : ["REF"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 20
-            },     
-            "conditions" : ["after_key", ["REF", ""]]
-        },
-        "navire" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0,
-                "frac_y_max" : 0.2,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },         
-            "key_sentences" : ["NOM DU NAVIRE"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3
-            },
-            "conditions" : ["after_key", ["NOM DU NAVIRE", ""]]
-        },
-        "marchandise" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0,
-                "frac_y_max" : 0.2,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : ["MARCHANDISE"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3
-            },
-            "conditions" : ["after_key", ["MARCHANDISE", ""]]
-        },
-        "quantite" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.04,
-                "frac_y_max" : 0.32,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },
-            "key_sentences" : ["QUANTITE"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3.5
-            },
-            "conditions" : ["after_key", ["QUANTITE", ""]]
-        },
-        "vendeur" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.04,
-                "frac_y_max" : 0.32,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },
-            "key_sentences" : ["VENDEUR"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3.5
-            },
-            "conditions" : ["after_key", ["VENDEUR", ""]]
-        },
-        "date" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.06,
-                "frac_y_max" : 0.34,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : ["DATE B/L"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3.5
-            },
-            "conditions" : ["date"]
-        },
-        "port" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.02,
-                "frac_y_max" : 0.30,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : ["PORT DE CHARGEMENT"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3.5
-            },
-            "conditions" : ["after_key", ["PORT DE CHARGEMENT", ""]]
-        },
-        "destination" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.02,
-                "frac_y_max" : 0.30,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : ["DESTINATION"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3.5
-            },
-            "conditions" : ["after_key", ["DESTINATION", ""]]
-        },
-        "acheteur" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.02,
-                "frac_y_max" : 0.30,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : ["ACHETEUR"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3.5
-            },
-            "conditions" : ["after_key", ["ACHETEUR", ""]]
-        },
-        "scelles" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.02,
-                "frac_y_max" : 0.30,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : ["SCELLES"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 4.5
-            },
-            "conditions" : ["after_key", ["SCELLES", ""]]
-        },
-        "analyse" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0,
-                "frac_y_max" : 1,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : [],
-            "relative_position" : {
-                "y_min" : 0.2,
-                "y_max" : 100,
-                "x_min" : 0,
-                "x_max" : 300
-            },
-            "conditions" : ["checkbox", "left", ["list", {"column" :"Denomination", "mode":"single"}]]
+            "conditions" : ["checkbox", "left",  {"path":"contract_analysis_path", "sheet_name" : "analyse", "column" :"Denomination", "mode":"single"}]
         }
     }
     
