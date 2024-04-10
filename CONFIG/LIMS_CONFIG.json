@@ -2,7 +2,7 @@
     "TOOL_PATH" : {
         "input_folder" : "C:\\Users\\CF6P\\Desktop\\ECAR\\Data\\CU\\OAIC",
         "output_folder" : "",
-        "copy_folder" : ""
+        "copy_folder" : "C:\\Users\\CF6P\\Desktop\\ECAR\\Data\\CU\\NON OAIC\\test_copy"
     },
 
     "MODELS" : ["CU OAIC", "CU hors OAIC", "Nutriset"],

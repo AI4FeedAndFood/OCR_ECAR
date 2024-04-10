@@ -4,8 +4,33 @@ import os
 import numpy as np
 import cv2
 import pandas as pd
+import win32com
 
 from ProcessPDF import PDF_to_images
+
+def extractFromMailBox(savePath, SenderEmailAddress, n_message_stop=10):
+
+    outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+    inbox = outlook.GetDefaultFolder(6) 
+    messages = inbox.Items
+    messages.Sort("ReceivedTime", True)
+
+    n_message = 0
+    while n_message <= n_message_stop:
+        message = messages[n_message]
+        # print(message.Subject, message.SenderEmailAddress, message.Unread)
+        try:
+            n_message+=1
+            if message.Unread:
+                attachments = message.Attachments
+                attachment = attachments.Item(1)
+                for attachment in message.Attachments:
+                    attachment.SaveAsFile(os.path.join(savePath, str(attachment.FileName)))
+                    if message.Unread:
+                        message.Unread = False
+                    break
+        except:
+            pass
 
 def getAllImages(path):
     def _get_all_images(path, extList=[".tiff", ".tif", ".png"]):

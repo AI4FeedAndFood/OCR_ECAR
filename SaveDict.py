@@ -1,7 +1,7 @@
 import os
 import dicttoxml
 import json
-import re
+from shutil import copyfile
 from copy import deepcopy
 from datetime import datetime
 
@@ -117,10 +117,12 @@ def convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims):
         related_code_lims = analysis_lims.dropna(subset="Related")
 
         # First all imposed tests
-        related_test.append(related_code_lims[related_code_lims["Related"]=="EVERYTIME"]["Code"].values.tolist()[0])
+        everytime_list = related_code_lims[related_code_lims["Related"]=="EVERYTIME"]["Code"].values.tolist()
+        if everytime_list:
+            related_test+=everytime_list
 
         # All tests that depend on one test
-        one_related = related_code_lims[related_code_lims["Related"].str.contains("ONE")]
+        one_related = related_code_lims[related_code_lims["Related"].str.startswith("ONE")]
         for code in all_codes:
             test = one_related[one_related["Related"].str.contains(code)]["Code"].values.tolist()
             if test:
@@ -128,13 +130,16 @@ def convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims):
                     related_test.append(test[0])
 
         # All tests that depend on several tests
-        all_related = deepcopy(related_code_lims[related_code_lims["Related"].str.contains("ALL")])
+        all_related = related_code_lims[related_code_lims["Related"].str.startswith("ALL")]
         if len(all_related)>0:
-            all_related["Related"] =  all_related["Related"].apply(lambda x: x.split(": ")[1].split(" "))
+            all_related.loc[:,["Related"]] =  deepcopy(all_related["Related"]).apply(lambda x: x.split(": ")[1].split(" "))
 
         for ind in all_related.index:
             if set(all_related["Related"][ind]).issubset(set(all_codes)):
                 related_test.append(all_related["Code"][ind])
+
+        related_test = list(set(related_test))
+        all_codes += related_test
 
         related_test = list(set(related_test))
 
@@ -246,6 +251,21 @@ def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.ContractCode"
             stacked_merged_dict.append(sample_dict)
 
     return stacked_merged_dict, added_number
+
+def saveToCopyFolder(save_folder, pdf_path, rename="", mode="same"):
+    if save_folder:
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+
+        base, extension = os.path.splitext(os.path.split(pdf_path)[1])
+
+        if rename:
+            base=rename
+        
+        if mode == "same":
+            new_name = base+extension
+
+        copyfile(pdf_path, f"{save_folder}/{new_name}")
 
 def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_helper, client_contract, xml_name="verified_XML"):
 
