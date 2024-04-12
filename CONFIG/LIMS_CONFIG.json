@@ -128,6 +128,11 @@
             "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF007",
             "input": "reference"
         },
+        "Dossier" : {
+            "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF011",
+            "input": ["navire", "marchandise"],
+            "join" : " - "
+        },
         "FractionCode" : {
             "path" : "Order.Samples.Sample.SampleFractions.SampleFraction.FractionCode",
             "input": "HARDCODE",

@@ -472,7 +472,8 @@ def main():
                                         # If it's from the past pdf change the pdf number
                                         if n_pdf>0 and n_sample==-1:
                                             n_pdf-=1
-                                            n_sample = 0
+                                            n_sample = len(list(pdfs_res_dict.items())[n_pdf][1].keys())-1
+                                            n_place = (n_pdf, n_sample)
                                         n_place = (n_pdf, n_sample)                                         
                                 
                                 # Go to next
@@ -497,9 +498,10 @@ def main():
                                             VerificationWindow.close()
                                             return
                         
-                        # If n_sample exceed the n_sample_end, go to the next one from the folowing pdf
-                        n_sample = 0
-                        n_pdf+=1
+                            # If n_sample exceed the n_sample_end, go to the next one from the folowing pdf
+                        if verif_event == "Valider ->":
+                            n_sample = 0
+                            n_pdf+=1
 
                 if VerificationWindow :  VerificationWindow.close()
                 if SuggestionW : SuggestionW.close()
