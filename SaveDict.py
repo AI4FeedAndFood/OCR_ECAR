@@ -1,7 +1,6 @@
 import os
 import dicttoxml
 import json
-from shutil import copyfile
 from copy import deepcopy
 from datetime import datetime
 
@@ -138,15 +137,12 @@ def convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims):
             if set(all_related["Related"][ind]).issubset(set(all_codes)):
                 related_test.append(all_related["Code"][ind])
 
-        related_test = list(set(related_test))
         all_codes += related_test
+        all_codes = list(set(all_codes))
 
-        related_test = list(set(related_test))
-
-        all_codes += related_test
         customer_package, package_codes, test_codes = [], [], []
         for code in all_codes:
-            if len(code)<5:
+            if len(code)<=4:
                 customer_package.append(code)
             elif code[0] == "P":
                 package_codes.append(code)
@@ -251,21 +247,6 @@ def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.ContractCode"
             stacked_merged_dict.append(sample_dict)
 
     return stacked_merged_dict, added_number
-
-def saveToCopyFolder(save_folder, pdf_path, rename="", mode="same"):
-    if save_folder:
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-
-        base, extension = os.path.splitext(os.path.split(pdf_path)[1])
-
-        if rename:
-            base=rename
-        
-        if mode == "same":
-            new_name = base+extension
-
-        copyfile(pdf_path, f"{save_folder}/{new_name}")
 
 def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_helper, client_contract, xml_name="verified_XML"):
 

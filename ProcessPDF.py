@@ -1,10 +1,28 @@
-import numpy as np
 import os
+import numpy as np
+import matplotlib.pyplot as plt
 import cv2
 import fitz
-from PIL import Image
-import matplotlib.pyplot as plt
+
 from copy import deepcopy
+from shutil import copyfile
+
+from PIL import Image
+
+def saveToCopyFolder(save_folder, pdf_path, rename="", mode="same"):
+    if save_folder:
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+
+        base, extension = os.path.splitext(os.path.split(pdf_path)[1])
+
+        if rename:
+            base=rename
+        
+        if mode == "same":
+            new_name = base+extension
+
+        copyfile(pdf_path, f"{save_folder}/{new_name}")
 
 def PDF_to_images(path):
     """ 
@@ -237,7 +255,6 @@ def crop_and_adjust(bin_image, rect):
     y0, y1, x0, x1 = _points_filter(rect_points) # get corners
     cropped_image = img_rot[y0:y1, x0:x1]
     
-
     return cropped_image
 
 def get_adjusted_image(bin_image, show=False):

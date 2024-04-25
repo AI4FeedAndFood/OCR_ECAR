@@ -43,13 +43,13 @@ def use_the_tool(folderPath, model):
     return scan_dict, pdfs_res_dict
 
 def create_row(row_counter, analyse, spec):
-    size = (int(1.5*INPUT_LENGTH)-10, 1)
+    size = (int(1.5*INPUT_LENGTH)-20, 1)
     row = [
         sg.pin(
             sg.Col([[sg.Push(),
                     
                     sg.I(analyse,
-                        key=("ana",row_counter), enable_events=True, expand_y=True, expand_x=False, justification='left', size=size),
+                        key=("ana",row_counter), enable_events=True, expand_y=True, expand_x=True, justification='left', size=size),
                         
                     # sg.I(spec,
                     #     key=("spec", row_counter), enable_events=False, expand_y=True, expand_x=False, justification='left', size=size),
@@ -134,7 +134,7 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
                     row = create_row(i, analyse, spec)
                     col.append(row)
 
-                frameLayout.append([sg.Column(col, key="-COL-", vertical_scroll_only=True, scrollable=True, expand_y=False, size=(int(X_main_dim*0.45), int(Y_main_dim*0.3)))])
+                frameLayout.append([sg.Column(col, key="-COL-", vertical_scroll_only=False, scrollable=True, expand_y=False, size=(int(X_main_dim*0.45), int(Y_main_dim*0.3)))])
                 frameLayout.append([sg.Push(), sg.B("Ajouter une analyse", key=("add",)), sg.Push()])
 
                 lineLayout.append([sg.Frame("Analyses et commentaires", frameLayout, expand_y=True)])
@@ -498,7 +498,7 @@ def main():
                                             VerificationWindow.close()
                                             return
                         
-                            # If n_sample exceed the n_sample_end, go to the next one from the folowing pdf
+                        # If n_sample exceed the n_sample_end, go to the next one from the folowing pdf
                         if verif_event == "Valider ->":
                             n_sample = 0
                             n_pdf+=1
