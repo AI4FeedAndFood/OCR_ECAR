@@ -5,24 +5,8 @@ import cv2
 import fitz
 
 from copy import deepcopy
-from shutil import copyfile
 
 from PIL import Image
-
-def saveToCopyFolder(save_folder, pdf_path, rename="", mode="same"):
-    if save_folder:
-        if not os.path.exists(save_folder):
-            os.makedirs(save_folder)
-
-        base, extension = os.path.splitext(os.path.split(pdf_path)[1])
-
-        if rename:
-            base=rename
-        
-        if mode == "same":
-            new_name = base+extension
-
-        copyfile(pdf_path, f"{save_folder}/{new_name}")
 
 def PDF_to_images(path):
     """ 

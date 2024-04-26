@@ -1,7 +1,7 @@
 {
     "TOOL_PATH" : {
         "input_folder" : "",
-        "output_folder" : "",
+        "output_folder" : "\\\\itiz-ft-fr.local\\AAG010\\Shared\\B2B\\Orders\\Eurofins_OCR_Tool",
         "copy_folder" : ""
     },
 

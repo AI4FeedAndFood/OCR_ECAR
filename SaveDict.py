@@ -4,6 +4,8 @@ import json
 from copy import deepcopy
 from datetime import datetime
 
+from shutil import copyfile
+
 def _update_dict(stack_dict, value, keys_path):
     keys_path = keys_path.split(".") if type(keys_path)==type("") else keys_path
     if len(keys_path) == 0:
@@ -125,8 +127,7 @@ def convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims):
         for code in all_codes:
             test = one_related[one_related["Related"].str.contains(code)]["Code"].values.tolist()
             if test:
-                if not test[0] in related_test:
-                    related_test.append(test[0])
+                related_test += test
 
         # All tests that depend on several tests
         all_related = related_code_lims[related_code_lims["Related"].str.startswith("ALL")]
@@ -258,6 +259,7 @@ def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_help
                 xml = xml.replace(f'</Sample_{number}>', '</Sample>')
         xml = xml.encode("UTF-8")
         return xml
+    
     # For all sample to extract from pdfs, keep only relevant fields
     stacked_samples_dict = []
     for pdf_name, sample_dict in verified_dict.items():
@@ -295,10 +297,41 @@ def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_help
         with open(xml_save_path, 'w', encoding='utf8') as result_file:
             result_file.write(xml.decode())
 
+def saveToCopyFolder(save_folder, pdf_path, rename="", mode="same"):
+    if save_folder:
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+
+        base, extension = os.path.splitext(os.path.split(pdf_path)[1])
+
+        if rename:
+            base=rename
+        
+        if mode == "same":
+            new_name = base+extension
+
+        copyfile(pdf_path, f"{save_folder}/{new_name}")
+
 if __name__ == "__main__":
     import pandas as pd
 
-    verified_dict = {}
+    verified_dict = {'CU OAIC': 
+                     {'sample_0': {'IMAGE': 'image_0', 
+                                   'EXTRACTION': {'reference': 
+                                                  {'sequence': 'RAF', 'confidence': 0.0, 'area': [1240, 0, 2480, 1052]}, 
+                                                  'navire': {'sequence': 'M/V - LUTA', 'confidence': 0.959, 'area': [254, 600, 1872, 721]}, 
+                                                  'marchandise': {'sequence': 'BLE TENDRE', 'confidence': 0.984, 'area': [286, 655, 1739, 776]}, 
+                                                  'quantite': {'sequence': '31 500 MT', 'confidence': 1.0, 'area': [398, 720, 1509, 823]}, 
+                                                  'vendeur': {'sequence': 'AVERE', 'confidence': 0.999, 'area': [406, 761, 1496, 892]}, 
+                                                  'date': {'sequence': '05/02/2024', 'confidence': 0.997, 'area': [374, 814, 2395, 955]}, 
+                                                  'port': {'sequence': 'ROUEN', 'confidence': 0.956, 'area': [1066, 602, 2480, 726]}, 
+                                                  'destination': {'sequence': 'ALGERIE', 'confidence': 0.999, 'area': [1272, 646, 2480, 798]}, 
+                                                  'acheteur': {'sequence': 'OAIC', 'confidence': 1.0, 'area': [1362, 779, 2480, 883]}, 
+                                                  'scelles': {'sequence': 'CUF 15', 'confidence': 0.924, 'area': [1400, 823, 2480, 954]}, 
+                                                  'analyse': {'sequence': ['Pack Protéines Dumas sec x5,7 + Humidité', "Zéaralénone",'Alvéogramme', 'Hagberg M0270', 'Poids spécifique QF015', 'GRAINS MOUCHETES / BOUTES / COLORES', 'Impuretés sur blé (ISO 7970)', 'ZELENY'], 'confidence': 0.981, 'area': [0, 701, 2480, 3508]}, 
+                                                  'code_produit': {'sequence': 'Ble tendre', 'confidence': 0.984, 'area': [286, 655, 1739, 776]}, 'client': 'Rouen'}}}}
+                                                  
+                                                  
     OCR_HELPER = json.load(open("CONFIG\OCR_config.json"))
 
     client_contract =  pd.read_excel(r"CONFIG\\eLIMS_contract_analysis.xlsx")
