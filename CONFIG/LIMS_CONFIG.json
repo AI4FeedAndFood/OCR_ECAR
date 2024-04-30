@@ -49,7 +49,8 @@
         },
         "PurchaseOrderReference" : {
             "path" : "Order.PurchaseOrderReference",
-            "input": "reference"
+            "input": ["navire", "reference"],
+            "join" : " "
         },
         "OrderComment" : {
             "path" : "Order.Comment",
