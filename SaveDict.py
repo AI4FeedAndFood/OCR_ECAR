@@ -20,9 +20,18 @@ def _update_dict(stack_dict, value, keys_path):
     return
 
 def _get_dict_value(dict, keys_path):
+
     value = dict
+    
     for key in keys_path.split("."):
-        value = value[key]
+
+        try:
+            value = value[key]
+        
+        # If the key not in the dict
+        except KeyError:
+            return False
+        
     return value
 
 def runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, deleted_rows):
@@ -191,7 +200,17 @@ def convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims):
             if value:
                 _update_dict(sample_XML_dict, value, keys_path)
         
-        xmls_format_dict.append(sample_XML_dict)
+        # Warning if not client or contract
+        print(sample_XML_dict)
+        if not _get_dict_value(sample_XML_dict, "Order.CustomerCode") or not _get_dict_value(sample_XML_dict, "Order.ContractCode"):
+            customerRef =  _get_dict_value(sample_XML_dict, "Order.Samples.Sample.CustomerReference")
+            if customerRef:
+                print(f"PAS DE CLIENT TROUVE POUR : {customerRef}, A CODER MANUELLEMENT")
+            else :
+                print(f"PAS DE CLIENT TROUVE")
+
+        else:
+            xmls_format_dict.append(sample_XML_dict)
         
     return xmls_format_dict
 

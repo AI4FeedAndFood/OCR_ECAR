@@ -89,6 +89,11 @@
             "input": "HARDCODE",
             "value": "AMBIANTE"
         },
+        "Remis" : {
+            "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF001",
+            "input": "HARDCODE",
+            "value": "CONTROL UNION"
+        },
         "Nature de la marchandise" : {
             "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF002",
             "input": "marchandise"

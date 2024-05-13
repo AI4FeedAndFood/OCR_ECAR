@@ -129,6 +129,7 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
                 
                 col = []
 
+                i = 0
                 for i, (analyse, spec) in enumerate(zip(sequence, specs)):
                     analyse = " ".join(analyse) if type(analyse) == type([]) else analyse
                     row = create_row(i, analyse, spec)
