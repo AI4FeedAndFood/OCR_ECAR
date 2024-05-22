@@ -258,6 +258,7 @@ def get_area(cropped_image, box, relative_position, corr_ratio=1.1):
 def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=None, show=False):
     
     zone_matches = {}
+
     for zone, key_points in MODEL_HELPER.items():
         key_match =  zone_key_match_dict[zone]
         box = key_match.OCR["box"]
@@ -271,11 +272,14 @@ def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELP
         zone_match = ZoneMatch(candidate_dicts, [], 0, [])
 
         # print(zone, " : ", candidate_dicts)
-
+   
         match_indices, res_seq = condition_filter(candidate_dicts, condition, model, application_path, ocr_pathes=OCR_PATHES, checkboxes=checkboxes)
+        
         if len(res_seq)!=0:
             if type(res_seq[0]) != type([]):
                 res_seq = unidecode(" ".join(res_seq))
+        elif res_seq == []:
+            res_seq =""
 
         zone_match.match_indices , zone_match.res_seq = match_indices, res_seq
         zone_match.confidence = min([candidate_dicts[i]["proba"] for i in zone_match.match_indices]) if zone_match.match_indices else 0
@@ -306,9 +310,11 @@ def model_particularities(zone_matches):
 
     marchandise = zone_matches["marchandise"]["sequence"]
     product_code = ""
+
     for pc in product_code_dict:
         if jaro_distance(unidecode(pc.upper()), marchandise)>0.95:
             product_code = pc
+            
     zone_matches["code_produit"] = deepcopy(zone_matches["marchandise"])
     zone_matches["code_produit"]["sequence"] = product_code 
 
@@ -327,6 +333,7 @@ def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, chec
     """
 
     zone_matches = get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=checkboxes, show=False)
+
     zone_matches = model_particularities(zone_matches)
 
     for zone, dict in zone_matches.items():
@@ -348,7 +355,6 @@ def main(scan_dict, model=MODEL):
             # image = get_adjusted_image(image, show=False)
             # plt.imsave("im.png", image, cmap="gray")
 
-
             templates_pathes = [os.path.join(CHECK_PATH, dir) for dir in os.listdir(CHECK_PATH) if os.path.splitext(dir)[1].lower() in [".png", ".jpg"]]
             checkboxes = get_checkboxes(image, templates_pathes=templates_pathes, show=False) # List of checkbox dict {"TOP_LEFT_X"...}
 
@@ -367,7 +373,7 @@ def main(scan_dict, model=MODEL):
 
 if __name__ == "__main__":
 
-    path = r"C:\Users\CF6P\Desktop\ECAR\Data\CU\OAIC\CU OAIC.pdf"
+    path = r"C:\Users\CF6P\Desktop\ECAR\Data\CU\NON OAIC\CU.pdf"
 
     from ProcessPDF import PDF_to_images
     import os
@@ -382,4 +388,4 @@ if __name__ == "__main__":
     for im_n, im in zip(images_names, images):
         scan_dict["debug"].update({im_n : im})
 
-    main(scan_dict, model="CU OAIC")
+    main(scan_dict, model="CU hors OAIC")

@@ -2,8 +2,10 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import cv2
+
 import re
+import cv2
+import sys, os
 
 from copy import deepcopy
 from unidecode import unidecode
@@ -16,14 +18,22 @@ year = datetime.now().year
 from paddleocr import PaddleOCR
 
 from JaroDistance import jaro_distance
-from ProcessPDF import  binarized_image, get_adjusted_image, get_iou
+from ProcessPDF import  binarized_image, get_checkboxes, get_iou
 from ConditionFilter import condition_filter
 
-MODEL = "Nutriset"
+MODEL = "CU"
 
-OCR_HELPER_JSON_PATH  = r"CONFIG\OCR_config.json"
+if 'AppData' in sys.executable:
+    application_path = os.getcwd()
+else : 
+    application_path = os.path.dirname(sys.executable)
+
+OCR_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\OCR_config.json")
 OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH, encoding="utf-8"))
 MODEL_HELPER = OCR_HELPER[MODEL]
+OCR_PATHES = OCR_HELPER["PATHES"]
+
+CHECK_PATH = os.path.join(application_path, OCR_PATHES["checkboxes_path"][MODEL])
 
 NULL_OCR = {"text" : "",
             "box" : [],
@@ -90,7 +100,7 @@ def paddle_OCR(image, show=False):
                 im,
                 (int(x1),int(y1)),
                 (int(x2),int(y2)),
-                (0,0,0),4)
+                (0,0,0),2)
         plt.imshow(cv2.cvtColor(im, cv2.COLOR_BGR2RGB))
         plt.show()
 
@@ -102,7 +112,7 @@ def find_match(key_sentences, paddleOCR, box, eta=0.95): # Could be optimized
     If it's the case return the index where the sentence can be found in the text returned by the OCR,
     else return an empty array
     Args:
-        key_sentences (list) : contains a list with one sentences, each word is a string.
+        key_sentences (list) : contains a list with one are more sentences, each word is a string.
         text (list) : text part of the dict returned by pytesseract 
 
     Returns:
@@ -114,8 +124,10 @@ def find_match(key_sentences, paddleOCR, box, eta=0.95): # Could be optimized
         best = base_match
         if new_match == None:
             return best
-        elif base_match.number_of_match < new_match.number_of_match: # If more match change best
+        elif base_match.number_of_match < new_match.number_of_match: # Choose best match
             best = new_match
+        elif (base_match.number_of_match == new_match.number_of_match): # If same number of match, choose the first one
+            best=base_match
         return best
     
     xmin,ymin,xmax, ymax = box
@@ -138,39 +150,39 @@ def find_match(key_sentences, paddleOCR, box, eta=0.95): # Could be optimized
 
                         if distance > eta : # take the matching neighborood among all matching words
                             if key_match == None:
-                                key_match = KeyMatch(i_place, distance, -1, i_word, i_key, dict_sequence)
+                                key_match = KeyMatch(i_place, distance, 1, i_word, i_key, dict_sequence)
                             elif key_match.last_place_word<i_word:
                                 key_match.confidence = min(key_match.confidence, distance)
                                 key_match.number_of_match+=1
-                                
-                if not seq_match and key_match : 
+                if seq_match==None : 
                     seq_match=key_match
                 else:
                     seq_match = _get_best(seq_match, key_match)
 
-        if not best_matches and seq_match : 
+        if best_matches==None : 
             best_matches=seq_match
         else:
             best_matches = _get_best(best_matches, seq_match)
     
     # if best_matches != None : print(best_matches.OCR["text"], key_sentences[best_matches.key_index], best_matches.number_of_match)
-
+    
     return best_matches
 
-def clean_sequence(paddle_list, checkboxes=None, full="|\[]_!<>{}—;$€&*‘§—~+", left="'(*): |\[]_!.<>{}—;$€&-"): 
+def clean_sequence(paddle_list, checkboxes, full="|\[]_!<>{}—;$€&*‘§—~+", left="'(*): |\[]_!.<>{}—;$€&-"): 
     res_dicts = []
     for dict_seq in paddle_list:
-        
-        if checkboxes:
-            if any([get_iou(dict_seq["box"], c["BOX"])>0.2 for c in checkboxes]):
-                continue
 
-        text = dict_seq["text"]
+        if any([get_iou(dict_seq["box"], c["BOX"])>0.2 for c in checkboxes]):
+            continue
 
         text = dict_seq["text"]
 
         text = re.sub(" :", ":", text)
         text = re.sub(":", ": ", text)
+        text = re.sub("\(", " (", text)
+
+        # Would increase "DATE B/L detection"
+        text = re.sub("B/L", "B/L ", text)
 
         text = re.sub("`", "'", text)
         text = re.sub("_", " ", text)
@@ -187,7 +199,7 @@ def clean_sequence(paddle_list, checkboxes=None, full="|\[]_!<>{}—;$€&*‘§
 
     return res_dicts
 
-def get_key_matches_and_OCR(cropped_image, JSON_HELPER=MODEL_HELPER, show=False):
+def get_key_matches_and_OCR(cropped_image, checkboxes, MODEL_HELPER=MODEL_HELPER, show=False):
     """
     Perform the OCR on the processed image, find the landmarks and make sure there are in the right area 
     Args:
@@ -204,20 +216,18 @@ def get_key_matches_and_OCR(cropped_image, JSON_HELPER=MODEL_HELPER, show=False)
 
     # Search text on the whole image
     full_img_OCR =  paddle_OCR(cropped_image, show)
-    full_img_OCR = clean_sequence(full_img_OCR)
-    for zone, key_points in JSON_HELPER.items():
-        landmark_region = key_points["subregion"] # Area informations
-        ymin, ymax = image_height*landmark_region[0][0],image_height*landmark_region[0][1]
-        xmin, xmax = image_width*landmark_region[1][0],image_width*landmark_region[1][1]
+    full_img_OCR = clean_sequence(full_img_OCR, checkboxes)
+    for zone, key_points in MODEL_HELPER.items():
+        subregion = key_points["subregion"] # Area informations
+        xmin, xmax = image_width*subregion["frac_x_min"], image_width*subregion["frac_x_max"]
+        ymin, ymax = image_height*subregion["frac_y_min"], image_height*subregion["frac_y_max"]
 
-        match = find_match(key_points["key_sentences"], full_img_OCR, (xmin,ymin,xmax, ymax))
-        
-        if show:
-            print("base : ", zone, (xmin, ymin, xmax, ymax))
-            plt.imshow(cropped_image[int(ymin):int(ymax), int(xmin):int(xmax)])
-            plt.show()
+        match = find_match(key_points["key_sentences"], full_img_OCR, (xmin,ymin,xmax, ymax)) if key_points["key_sentences"] else None
+        # print("base : ", zone, (xmin, ymin, xmax, ymax))
+        # plt.imshow(cropped_image[int(ymin):int(ymax), int(xmin):int(xmax)])
+        # plt.show()
 
-        if match != None:
+        if match:
             # print("found : ", zone, " - ", match.OCR["box"])
             zone_match_dict.update({zone : match })
             # cv2.rectangle(cropped_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -238,38 +248,34 @@ def get_area(cropped_image, box, relative_position, corr_ratio=1.1):
     im_y, im_x = cropped_image.shape[:2]
     x1,y1,x2,y2 = box
     h, w = abs(y2-y1), abs(x2-x1)
-    h_relative, w_relative = h*(relative_position[0][1]-relative_position[0][0])//2, w*(relative_position[1][1]-relative_position[1][0])//2
-    y_mean, x_mean = y1+h*relative_position[0][0]+h_relative, x1+w*relative_position[1][0]+w_relative
+    h_relative, w_relative = h*(relative_position["y_max"]-relative_position["y_min"])//2, w*(relative_position["x_max"]-relative_position["x_min"])//2
+    y_mean, x_mean = y1+h*relative_position["y_min"]+h_relative, x1+w*relative_position["x_min"]+w_relative
     x_min, x_max = max(x_mean-w_relative*corr_ratio,0), min(x_mean+w_relative*corr_ratio*2, im_x)
     y_min, y_max = max(y_mean-h_relative*corr_ratio, 0), min(y_mean+h_relative*corr_ratio*2, im_y)
     (y_min, x_min) , (y_max, x_max) = np.array([[y_min, x_min], [y_max, x_max]]).astype(int)[:2]
     return x_min, y_min, x_max, y_max
 
-def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, JSON_HELPER, model, checkboxes=None, show=False):
+def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=None, show=False):
     
     zone_matches = {}
-    for zone, key_points in JSON_HELPER.items():
-
+    for zone, key_points in MODEL_HELPER.items():
         key_match =  zone_key_match_dict[zone]
         box = key_match.OCR["box"]
         condition, relative_position = key_points["conditions"], key_points["relative_position"]
-
+        # If the key match is not found, the searching area is the subregion of the field
         xmin, ymin, xmax, ymax = box if key_match.confidence==-1 else get_area(cropped_image, box, relative_position, corr_ratio=1.15)
-
+        
         candidate_dicts = [dict_sequence for dict_sequence in full_img_OCR if 
                       (xmin<dict_sequence["box"][0]<xmax) and (ymin<dict_sequence["box"][1]<ymax)]
                 
         zone_match = ZoneMatch(candidate_dicts, [], 0, [])
 
         # print(zone, " : ", candidate_dicts)
+   
+        match_indices, res_seq = condition_filter(candidate_dicts, condition, model, application_path, ocr_pathes=OCR_PATHES, checkboxes=checkboxes)
 
-        match_indices, res_seq = condition_filter(candidate_dicts, condition, model, checkboxes)
-
-        if len(res_seq)!=0:
-            if type(res_seq[0]) != type([]):
-                res_seq = unidecode(" ".join(res_seq))
-            else:
-                res_seq = [unidecode(" ".join(seq)) for seq in res_seq]
+        if type(res_seq[0]) != type([]):
+            res_seq = unidecode(" ".join(res_seq))
 
         zone_match.match_indices , zone_match.res_seq = match_indices, res_seq
         zone_match.confidence = min([candidate_dicts[i]["proba"] for i in zone_match.match_indices]) if zone_match.match_indices else 0
@@ -289,13 +295,26 @@ def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, JSON_HELPE
     return zone_matches 
 
 def model_particularities(zone_matches):
+    # Add M/V to the navire
+    zone_matches["navire"]["sequence"] = "M/V - " + zone_matches["navire"]["sequence"]
 
-    zone_matches["N_de_commande"]["sequence"] = [s.strip(" :") for s in zone_matches["N_de_commande"]["sequence"]]
-    zone_matches["N_OA"]["sequence"] = [s.strip(" :") for s in zone_matches["N_OA"]["sequence"]]
+    # Delte scelles mistake
+    zone_matches["scelles"]["sequence"] = [] if jaro_distance(zone_matches["scelles"]["sequence"].lower(), "autres")>0.90 else zone_matches["scelles"]["sequence"]
+
+    # Select a product Code
+    product_code_dict = ["Ble tendre", "Ble dur", "Fourrage orge", "Orge de brasserie"]
+
+    marchandise = zone_matches["marchandise"]["sequence"]
+    product_code = ""
+    for pc in product_code_dict:
+        if jaro_distance(unidecode(pc.upper()), marchandise)>0.95:
+            product_code = pc
+    zone_matches["code_produit"] = deepcopy(zone_matches["marchandise"])
+    zone_matches["code_produit"]["sequence"] = product_code 
 
     return zone_matches
 
-def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, checkboxes=None, JSON_HELPER=MODEL_HELPER):
+def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, checkboxes=None, MODEL_HELPER=MODEL_HELPER):
     """
     The main fonction to extract text from FDA
 
@@ -307,7 +326,7 @@ def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, chec
         }
     """
 
-    zone_matches = get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, JSON_HELPER, model, checkboxes=checkboxes, show=True)
+    zone_matches = get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=checkboxes, show=False)
     zone_matches = model_particularities(zone_matches)
 
     for zone, dict in zone_matches.items():
@@ -325,16 +344,19 @@ def main(scan_dict, model=MODEL):
         for i_image, (image_name, sample_image) in enumerate(list(images_dict.items())):
             print("--------------", image_name, "--------------")
 
-            bin_image = binarized_image(sample_image)  
-            image = get_adjusted_image(bin_image, show=True)
-            plt.imsave("im.png", image, cmap="gray")
+            image = binarized_image(sample_image)  
+            # image = get_adjusted_image(image, show=False)
+            # plt.imsave("im.png", image, cmap="gray")
+
+            templates_pathes = [os.path.join(CHECK_PATH, dir) for dir in os.listdir(CHECK_PATH) if os.path.splitext(dir)[1].lower() in [".png", ".jpg"]]
+            checkboxes = get_checkboxes(image, templates_pathes=templates_pathes, show=False) # List of checkbox dict {"TOP_LEFT_X"...}
 
             # plt.imshow(image)
             # plt.show()
 
-            zone_key_match_dict, full_img_OCR = get_key_matches_and_OCR(image, show=True)
+            zone_key_match_dict, full_img_OCR = get_key_matches_and_OCR(image, checkboxes, show=False)
 
-            sample_matches = textExtraction(image, zone_key_match_dict, full_img_OCR, model, JSON_HELPER=MODEL_HELPER)
+            sample_matches = textExtraction(image, zone_key_match_dict, full_img_OCR, model, checkboxes=checkboxes, MODEL_HELPER=MODEL_HELPER)
 
             # Here one scan = one sample
             pdfs_res_dict[pdf][f"sample_{i_image}"] = {"IMAGE" : image_name,
@@ -344,21 +366,19 @@ def main(scan_dict, model=MODEL):
 
 if __name__ == "__main__":
 
-    path = r"C:\Users\CF6P\Desktop\ECAR\Data\Nutriset.pdf"
+    path = r"C:\Users\CF6P\Desktop\ECAR\Data\CU\NON OAIC\CU.pdf"
 
     from ProcessPDF import PDF_to_images
     import os
 
     images = PDF_to_images(path)
 
-
-    images = images[2:]
+    images = images[:]
     images_names = ["res"+f"_{i}" for i in range(1,len(images)+1)]
 
 
-    scan_dict = {"test" : {}}
+    scan_dict = {"debug" : {}}
     for im_n, im in zip(images_names, images):
-        scan_dict["test"].update({im_n : im})
+        scan_dict["debug"].update({im_n : im})
 
-    main(scan_dict)
-    
+    main(scan_dict, model="CU hors OAIC")

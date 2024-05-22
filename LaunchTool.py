@@ -76,10 +76,10 @@ def TextCVTool(path, model, config = ["paddle", "OCR", "en"]):
     scan_dict = getAllImages(path)
 
     if model == 'Nutriset':
-        from ModelNutriset import main
+        from Model_Nutriset import main
     
     if model in  ["CU hors OAIC", "CU OAIC"]:
-        from ModelCU import main
+        from Model_CU import main
         
     pdfs_res_dict["RESPONSE"] = main(scan_dict, model)
 

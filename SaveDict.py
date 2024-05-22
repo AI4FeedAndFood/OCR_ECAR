@@ -201,7 +201,6 @@ def convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims):
                 _update_dict(sample_XML_dict, value, keys_path)
         
         # Warning if not client or contract
-        print(sample_XML_dict)
         if not _get_dict_value(sample_XML_dict, "Order.CustomerCode") or not _get_dict_value(sample_XML_dict, "Order.ContractCode"):
             customerRef =  _get_dict_value(sample_XML_dict, "Order.Samples.Sample.CustomerReference")
             if customerRef:
@@ -273,6 +272,7 @@ def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_help
     def _rename_sample(xml, added_number):
         xml = xml.decode("UTF-8")
         for number in added_number:
+            # XML accepts to have several time the same keys, dict don't, then sample are normalised
             if f'<Sample_{number} type="dict">' in xml:
                 xml = xml.replace(f'<Sample_{number} type="dict">', '<Sample type="dict">')
                 xml = xml.replace(f'</Sample_{number}>', '</Sample>')

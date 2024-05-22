@@ -9,103 +9,226 @@
         },
 
     "Nutriset": {
-        "client" : {
+        "Nom" : {
             "global_info" : 1,
-            "subregion" : [[0, 0.2], [0, 0.5]],
-            "key_sentences" : ["De la part de :"],
-            "relative_position" : [[-0.5,1], [0,2]],
-            "conditions" : ["after_key", ["de la part de :", ""]]
+            "subregion" : {
+                "frac_y_min" : 0,
+                "frac_y_max" : 0.3,
+                "frac_x_min" : 0,
+                "frac_x_max" : 0.5
+            },         
+            "key_sentences" : ["De la part de"],
+            "relative_position" : {
+                "y_min" : -0.2,
+                "y_max" : 1,
+                "x_min" : 0,
+                "x_max" : 4
+            },     
+            "conditions" : ["after_key", {"after": "De la part de", "before":"A l'attention de"}]
         },
-        "N_de_commande": {
+        "N_commande" : {
             "global_info" : 1,
-            "subregion" : [[0, 0.2], [0.5, 1]],
-            "key_sentences" : ["Cmd N° :"],
-            "relative_position" : [[-0.5,1], [0,2]],
-            "conditions" : ["after_key", ["Cmd N° :", ""]]
+            "subregion" : {
+                "frac_y_min" : 0,
+                "frac_y_max" : 0.4,
+                "frac_x_min" : 0.5,
+                "frac_x_max" : 1
+            },         
+            "key_sentences" : ["Cmd N°"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 1,
+                "x_min" : 0,
+                "x_max" : 3
+            },
+            "conditions" : ["after_key", {"after":"Cmd N°", "before":"OA N°"}]
         },
-        "N_OA": {
+        "N_OA" : {
             "global_info" : 1,
-            "subregion" : [[0, 0.2], [0.5, 1]],
-            "key_sentences" : ["OA N° :"],
-            "relative_position" : [[-0.5,1], [0,2]],
-            "conditions" : ["after_key", ["OA N° :", ""]]
+            "subregion" : {
+                "frac_y_min" : 0,
+                "frac_y_max" : 0.2,
+                "frac_x_min" : 0.5,
+                "frac_x_max" : 1
+            },       
+            "key_sentences" : ["OA N°"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 1,
+                "x_min" : 0,
+                "x_max" : 3
+            },
+            "conditions" : ["after_key", {"after":"OA N°", "before":""}]
         },
-        "fournisseur" : {
+        "classement" : {
             "global_info" : 1,
-            "subregion" : [[0.2, 0.5], [0.2, 0.6]],
-            "key_sentences" : ["Fournisseur"],
-            "relative_position" : [[1,3], [-2,2]],
-            "conditions" : ["after_key", ["", ""]]
+            "subregion" : {
+                "frac_y_min" : 0.2,
+                "frac_y_max" : 0.6,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },
+            "key_sentences" : ["Classement"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 1,
+                "x_min" : 0,
+                "x_max" : 3.5
+            },
+            "conditions" : ["after_key", {"after" : "Classement", "before" : ""}]
         },
-        "N_de_lot" : {
+        "type_produit" : {
             "global_info" : 1,
-            "subregion" : [[0.2, 0.5], [0.2, 0.6]],
-            "key_sentences" : ["Lot fournisseur"],
-            "relative_position" : [[1,3], [-1.5,1.5]],
-            "conditions" : ["after_key", ["", ""]]
+            "subregion" : {
+                "frac_y_min" : 0.04,
+                "frac_y_max" : 0.32,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },
+            "key_sentences" : ["Lot fournisser"],
+            "relative_position" : {
+                "y_min" : -4,
+                "y_max" : -1,
+                "x_min" : -1,
+                "x_max" : 3.5
+            },
+            "conditions" : []
         },
-        "nature_produit" : {
-            "global_info" : 1,
-            "subregion" : [[0.2, 0.5], [0.4, 0.9]],
-            "key_sentences" : ["Lot fournisseur"],
-            "relative_position" : [[-3,-1], [-0.5,2]],
-            "conditions" : ["format", ["NNN-NN"]]
-        },
-        "N_d_echantillon" : {
+        "N_echantillon" : {
             "global_info" : 0,
-            "subregion" : [[0.3, 0.8], [0, 0.4]],
-            "key_sentences" : ["N° echantillon"],
-            "relative_position" : [[1,8], [-0.2,1]],
-            "conditions" : ["table", "N° d'ECH"]
+            "subregion" : {
+                "frac_y_min" : 0.3,
+                "frac_y_max" : 0.7,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },       
+            "key_sentences" : ["N° d'ECH"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 5,
+                "x_min" : -0.1,
+                "x_max" : 1.1
+            },
+            "conditions" : ["table"]
         },
-        "ligne_de_production" : {
+        "ligne_production" : {
             "global_info" : 0,
-            "subregion" : [[0.3, 0.8], [0, 0.43]],
+            "subregion" : {
+                "frac_y_min" : 0.3,
+                "frac_y_max" : 0.7,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },       
             "key_sentences" : ["Ligne de production"],
-            "relative_position" : [[1,8], [-0.2,1]],
-            "conditions" : ["table", "Ligne de production"]
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 5,
+                "x_min" : -0.1,
+                "x_max" : 1.1
+            },
+            "conditions" : ["table"]
         },
-        "N°_de_fabrication" : {
+        "N_fabrication" : {
             "global_info" : 0,
-            "subregion" : [[0.3, 0.8], [0.1, 0.5]],
+            "subregion" : {
+                "frac_y_min" : 0.3,
+                "frac_y_max" : 0.7,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },       
             "key_sentences" : ["N° de fabrication"],
-            "relative_position" : [[1,8], [-0.2,1]],
-            "conditions" : ["table", "N° de fabrication"]
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 5,
+                "x_min" : -0.1,
+                "x_max" : 1.1
+            },
+            "conditions" : ["table"]
         },
-        "date_de_prelevement" : {
+        "date_prelevment" : {
             "global_info" : 0,
-            "subregion" : [[0.3, 0.8], [0.2, 0.6]],
-            "key_sentences" : ["Date de prélèvement"],
-            "relative_position" : [[1,8], [-0.2,1]],
-            "conditions" : ["table", "date"]
+            "subregion" : {
+                "frac_y_min" : 0.3,
+                "frac_y_max" : 0.7,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },       
+            "key_sentences" : ["Date de prelevement"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 5,
+                "x_min" : -0.1,
+                "x_max" : 1.1
+            },
+            "conditions" : ["table"]
         },
         "quantite" : {
             "global_info" : 0,
-            "subregion" : [[0.3, 0.8], [0.3, 0.8]],
-            "key_sentences" : ["Quantité"],
-            "relative_position" : [[1,8], [-0.2,1]],
-            "conditions" : ["table", "date"]
+            "subregion" : {
+                "frac_y_min" : 0.3,
+                "frac_y_max" : 0.7,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },       
+            "key_sentences" : ["Quantite"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 5,
+                "x_min" : -0.1,
+                "x_max" : 1.1
+            },
+            "conditions" : ["table"]
         },
         "commentaire" : {
             "global_info" : 0,
-            "subregion" : [[0.3, 0.8], [0.4, 0.9]],
-            "key_sentences" : ["commentaire"],
-            "relative_position" : [[1,8], [-1.5,1.4]],
-            "conditions" : ["table", "commentaire"]
+            "subregion" : {
+                "frac_y_min" : 0.3,
+                "frac_y_max" : 0.7,
+                "frac_x_min" : 0,
+                "frac_x_max" : 1
+            },       
+            "key_sentences" : ["Commentaire"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 5,
+                "x_min" : -0.1,
+                "x_max" : 1.1
+            },
+            "conditions" : ["table"]
         },
         "analyse" : {
-            "global_info" : 1,
-            "subregion" : [[0.4, 1], [0, 0.6]],
-            "key_sentences" : ["Analyse à réaliser"],
-            "relative_position" : [[1,16], [-1,1.5]],
-            "conditions" : ["list", {"path":"analysis_path", "sheet_name" : "analyse", "column" :"Denomination", "mode":"multiple"}]
+            "global_info" : 0,
+            "subregion" : {
+                "frac_y_min" : 0.6,
+                "frac_y_max" : 0.9,
+                "frac_x_min" : 0,
+                "frac_x_max" : 0.5
+            },       
+            "key_sentences" : ["Analyses à réaliser"],
+            "relative_position" : {
+                "y_min" : -0.5,
+                "y_max" : 5,
+                "x_min" : -0.1,
+                "x_max" : 1.1
+            },
+            "conditions" : ["table"]
         },
-        "specifications" : {
-            "global_info" : 1,
-            "subregion" : [[0.4, 1], [0.35, 1]],
-            "key_sentences" : ["specifications"],
-            "relative_position" : [[1,16], [-1.5,1.5]],
-            "conditions" : ["table", "Spécifications"]
+        "specification" : {
+            "global_info" : 0,
+            "subregion" : {
+                "frac_y_min" : 0.6,
+                "frac_y_max" : 0.9,
+                "frac_x_min" : 0.5,
+                "frac_x_max" : 1
+            },       
+            "key_sentences" : ["Specification"],
+            "relative_position" : {
+                "y_min" : 0.2,
+                "y_max" : 100,
+                "x_min" : 0,
+                "x_max" : 300
+            },
+            "conditions" : ["checkbox", "left",  {"path":"contract_analysis_path", "sheet_name" : "analyse", "column" :"Denomination", "mode":"single"}]
         }
     },
     
