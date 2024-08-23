@@ -255,11 +255,11 @@ def get_area(cropped_image, box, relative_position, corr_ratio=1.1):
     (y_min, x_min) , (y_max, x_max) = np.array([[y_min, x_min], [y_max, x_max]]).astype(int)[:2]
     return x_min, y_min, x_max, y_max
 
-def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=None, show=False):
+def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, zone_key_dict, model, checkboxes=None, show=False):
     
     zone_matches = {}
 
-    for zone, key_points in MODEL_HELPER.items():
+    for zone, key_points in zone_key_dict.items():
         key_match =  zone_key_match_dict[zone]
         box = key_match.OCR["box"]
         condition, relative_position = key_points["conditions"], key_points["relative_position"]
@@ -320,7 +320,7 @@ def model_particularities(zone_matches):
 
     return zone_matches
 
-def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, checkboxes=None, MODEL_HELPER=MODEL_HELPER):
+def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, checkboxes=None, zone_key_dict=MODEL_HELPER):
     """
     The main fonction to extract text from FDA
 
@@ -332,7 +332,7 @@ def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, chec
         }
     """
 
-    zone_matches = get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=checkboxes, show=False)
+    zone_matches = get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, zone_key_dict, model, checkboxes=checkboxes, show=False)
 
     zone_matches = model_particularities(zone_matches)
 
@@ -363,7 +363,7 @@ def main(scan_dict, model=MODEL):
 
             zone_key_match_dict, full_img_OCR = get_key_matches_and_OCR(image, checkboxes, show=False)
 
-            sample_matches = textExtraction(image, zone_key_match_dict, full_img_OCR, model, checkboxes=checkboxes, MODEL_HELPER=MODEL_HELPER)
+            sample_matches = textExtraction(image, zone_key_match_dict, full_img_OCR, model, checkboxes=checkboxes, zone_key_dict=MODEL_HELPER)
 
             # Here one scan = one sample
             pdfs_res_dict[pdf][f"sample_{i_image}"] = {"IMAGE" : image_name,
@@ -373,7 +373,7 @@ def main(scan_dict, model=MODEL):
 
 if __name__ == "__main__":
 
-    path = r"C:\Users\CF6P\Desktop\ECAR\Data\CU\NON OAIC\CU.pdf"
+    path = r"C:\Users\CF6P\Desktop\ECAR\Data\CU\NON OAIC\test\NOAIC_test_xl.pdf"
 
     from ProcessPDF import PDF_to_images
     import os
@@ -388,4 +388,4 @@ if __name__ == "__main__":
     for im_n, im in zip(images_names, images):
         scan_dict["debug"].update({im_n : im})
 
-    main(scan_dict, model="CU hors OAIC")
+    main(scan_dict, model="CU OAIC")

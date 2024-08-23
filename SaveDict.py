@@ -1,10 +1,11 @@
 import os
 import dicttoxml
 import json
-from copy import deepcopy
-from datetime import datetime
 
 from shutil import copyfile
+from copy import deepcopy
+from datetime import datetime
+from PIL import Image
 
 def _update_dict(stack_dict, value, keys_path):
     keys_path = keys_path.split(".") if type(keys_path)==type("") else keys_path
@@ -37,6 +38,7 @@ def _get_dict_value(dict, keys_path):
 def runningSave(res_dict, save_path_json, verif_values, pdf_name, sample_name, deleted_rows):
 
     analyses, comments = [], []
+
     for key, items in verif_values.items():
         # Analysis case
         if key[0] == "ana":
@@ -238,7 +240,7 @@ def arrangeForClientSpecificites(stacked_samples_dict, analysis_lims, model):
 
     return stacked_samples_dict
 
-def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.ContractCode"):
+def mergeOrderSamples(stacked_samples_dict, merge_condition="Order.PurchaseOrderReference"):
     
     def _merge_bool(merged_dict, sample_dict, merge_condition):
         # 
@@ -291,7 +293,8 @@ def finalSaveDict(verified_dict, xmls_save_path, analysis_lims, model, lims_help
     stacked_samples_dict = arrangeForClientSpecificites(stacked_samples_dict, analysis_lims, model)
 
     # Convert samples dict to the XML format
-    xmls_format_dict = convertDictToLIMS(stacked_samples_dict, lims_helper["LIMS_CONVERTER"], analysis_lims)
+    lims_converter = lims_helper["LIMS_CONVERTER"]["CU"] if "CU" in model else lims_helper["LIMS_CONVERTER"][model]
+    xmls_format_dict = convertDictToLIMS(stacked_samples_dict, lims_converter, analysis_lims)
 
     xmls_merged_dict, added_number = mergeOrderSamples(xmls_format_dict, merge_condition=lims_helper["SAMPLE_MERGER"])
     

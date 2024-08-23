@@ -431,8 +431,9 @@ def get_checkboxes(cropped_image, templates_pathes, show=False):
     templates = [Template(template_path, "check", 0) for template_path in templates_pathes]
     detections = checkbox_match(templates, cropped_image)
     filtered_detection = non_max_suppression(detections)
-    if show : 
+    if show: 
         visualize(cropped_image, filtered_detection)
+        plt.imsave("saved.jpg", cropped_image, cmap="gray")
     
     return sorted(filtered_detection, key=lambda c: c["TOP_LEFT_Y"])
 

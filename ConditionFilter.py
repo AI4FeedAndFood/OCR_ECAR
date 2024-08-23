@@ -117,6 +117,15 @@ def cell_process(candidates):
         match_indices+=[i_text]
     return match_indices, res_seq
 
+def int_process(candidates):
+    match_indices, res_seq = [], []
+    for i_text, dict_text in enumerate(candidates):
+        if dict_text["text"][0].isdigit():
+            res_seq=[dict_text["text"][0]]
+            match_indices+=[i_text]
+
+    return match_indices, res_seq
+
 def after_key_process(candidates, bound_keys, similarity=0.85):
 
     def _get_wanted_seq(full_seq, target_words, search_range):
@@ -150,7 +159,7 @@ def after_key_process(candidates, bound_keys, similarity=0.85):
         
         return res_index, full_seq
     
-    strip = '().*:‘;,§"'+"'"
+    strip = ' ().*:‘;,§"'+"'"
     key_boundaries = {"after" : [], "before" : []} 
 
     # Get the all matched between keys and sequences for the start and the end key
@@ -478,6 +487,9 @@ def condition_filter(candidates_dicts, condition, model, application_path, ocr_p
     
     if condition[0] == "cell": # A special filter for numero d'echantillon
         match_indices, res_seq = cell_process(candidates)
+
+    if condition[0] == "int": # A special filter for numero d'echantillon
+        match_indices, res_seq = int_process(candidates)
 
     return match_indices, res_seq
 

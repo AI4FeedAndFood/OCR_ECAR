@@ -19,7 +19,7 @@ def is_valid(folderpath, model):
     if len(model) != 1:
         sg.popup_error("Veuillez cocher un model")
         return False
-    if not (folderpath and os.path.exists(folderpath)):
+    if not (folderpath and os.path.exists(folderpath) and os.path.isdir(folderpath)):
         sg.popup_error("Le dossier n'existe pas")
         return False
     
@@ -81,7 +81,7 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
 
     added_field = LIMS_HELPER["ADDED_FIELDS"]
     product_codes = LIMS_HELPER["PRODUCTCODE_DICT"]
-    found_product_code = extract_dict["code_produit"]["sequence"]
+    found_product_code = extract_dict["code_produit"]["sequence"] if "code_produit" in extract_dict else ""
     if found_product_code != "":
         found_product_code = found_product_code if found_product_code in product_codes.keys() else [pc for pc in product_codes if product_codes[pc]==found_product_code][0]
 
@@ -365,6 +365,7 @@ def main():
                     print("_________ DONE _________")
 
                     # Save the extraction json on RES
+                    print(res_dict)
                     with open(res_save_path, 'w', encoding='utf-8') as json_file:
                         json.dump(res_dict, json_file,  ensure_ascii=False)
     

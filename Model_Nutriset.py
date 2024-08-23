@@ -7,6 +7,7 @@ import re
 import cv2
 import sys, os
 
+from collections import defaultdict
 from copy import deepcopy
 from unidecode import unidecode
 
@@ -21,7 +22,7 @@ from JaroDistance import jaro_distance
 from ProcessPDF import  binarized_image, get_checkboxes, get_iou
 from ConditionFilter import condition_filter
 
-MODEL = "CU"
+MODEL = "Nutriset"
 
 if 'AppData' in sys.executable:
     application_path = os.getcwd()
@@ -32,8 +33,6 @@ OCR_HELPER_JSON_PATH  = os.path.join(application_path, "CONFIG\OCR_config.json")
 OCR_HELPER = json.load(open(OCR_HELPER_JSON_PATH, encoding="utf-8"))
 MODEL_HELPER = OCR_HELPER[MODEL]
 OCR_PATHES = OCR_HELPER["PATHES"]
-
-CHECK_PATH = os.path.join(application_path, OCR_PATHES["checkboxes_path"][MODEL])
 
 NULL_OCR = {"text" : "",
             "box" : [],
@@ -168,12 +167,9 @@ def find_match(key_sentences, paddleOCR, box, eta=0.95): # Could be optimized
     
     return best_matches
 
-def clean_sequence(paddle_list, checkboxes, full="|\[]_!<>{}—;$€&*‘§—~+", left="'(*): |\[]_!.<>{}—;$€&-"): 
+def clean_sequence(paddle_list, full="|\[]_!<>{}—;$€&*‘§—~+", left="'(*): |\[]_!.<>{}—;$€&-"): 
     res_dicts = []
     for dict_seq in paddle_list:
-
-        if any([get_iou(dict_seq["box"], c["BOX"])>0.2 for c in checkboxes]):
-            continue
 
         text = dict_seq["text"]
 
@@ -199,7 +195,7 @@ def clean_sequence(paddle_list, checkboxes, full="|\[]_!<>{}—;$€&*‘§—~+
 
     return res_dicts
 
-def get_key_matches_and_OCR(cropped_image, checkboxes, MODEL_HELPER=MODEL_HELPER, show=False):
+def get_key_matches_and_OCR(cropped_image, MODEL_HELPER=MODEL_HELPER, show=False):
     """
     Perform the OCR on the processed image, find the landmarks and make sure there are in the right area 
     Args:
@@ -216,7 +212,7 @@ def get_key_matches_and_OCR(cropped_image, checkboxes, MODEL_HELPER=MODEL_HELPER
 
     # Search text on the whole image
     full_img_OCR =  paddle_OCR(cropped_image, show)
-    full_img_OCR = clean_sequence(full_img_OCR, checkboxes)
+    full_img_OCR = clean_sequence(full_img_OCR)
     for zone, key_points in MODEL_HELPER.items():
         subregion = key_points["subregion"] # Area informations
         xmin, xmax = image_width*subregion["frac_x_min"], image_width*subregion["frac_x_max"]
@@ -253,68 +249,212 @@ def get_area(cropped_image, box, relative_position, corr_ratio=1.1):
     x_min, x_max = max(x_mean-w_relative*corr_ratio,0), min(x_mean+w_relative*corr_ratio*2, im_x)
     y_min, y_max = max(y_mean-h_relative*corr_ratio, 0), min(y_mean+h_relative*corr_ratio*2, im_y)
     (y_min, x_min) , (y_max, x_max) = np.array([[y_min, x_min], [y_max, x_max]]).astype(int)[:2]
-    return x_min, y_min, x_max, y_max
 
-def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=None, show=False):
+    return int(x_min), int(y_min), int(x_max), int(y_max)
+
+def get_horizontal_lines(segments, tolerance=50):
+    y_groups = defaultdict(list)
+    
+    for candidate in segments:
+        x1, y1, x2, y2 = candidate["box"]
+        # Calculer la moyenne des y pour le segment
+        y_avg = (y1 + y2) // 2
+        
+        # Trouver le groupe existant dans y_groups qui est proche de y_avg
+        found_group = False
+        for y in y_groups.keys():
+            if abs(y - y_avg) <= tolerance:
+                y_groups[y].append(y_avg)
+                found_group = True
+                break
+        if not found_group:
+            y_groups[y_avg].append(y_avg)
+    
+    # Retourner les valeurs moyennes distinctes de y pour chaque groupe
+    return sorted(list(y_groups.keys()))
+
+def get_samples_rows_dict(cropped_image, zone_key_match_dict, full_img_OCR, zone_key_dict, model):
+    """
+    Extrait des lignes d'échantillons à partir de l'image recadrée en fonction des zones prédéfinies.
+
+    Args:
+    - cropped_image: Image recadrée à analyser.
+    - zone_key_match_dict: Dictionnaire associant les zones aux correspondances OCR.
+    - full_img_OCR: Liste des séquences OCR extraites de l'image complète.
+    - zone_key_dict: Dictionnaire définissant les zones et leurs conditions.
+    - model: Modèle utilisé pour filtrer les candidats.
+
+    Returns:
+    - sample_rows_dict: Dictionnaire contenant les informations extraites pour chaque ligne d'échantillon.
+    """
+    columns = {}
+
+    for zone, key_points in zone_key_dict.items():
+        condition, relative_position = key_points["conditions"], key_points["relative_position"]
+        if condition[0] == "table":
+            key_match = zone_key_match_dict[zone]
+            box = key_match.OCR["box"]
+            
+            # Calcul de la zone de recherche
+            if key_match.confidence == -1:
+                xmin, ymin, xmax, ymax = box
+            else:
+                xmin, ymin, xmax, ymax = get_area(cropped_image, box, relative_position, corr_ratio=1.15)
+            
+            # Filtrage des candidats OCR
+            candidate_dicts = [dict_sequence for dict_sequence in full_img_OCR if 
+                               xmin < dict_sequence["box"][0] < xmax and ymin < dict_sequence["box"][1] < ymax]
+            columns[zone] = {
+                "found": key_match.confidence != -1,
+                "box": (xmin, ymin, xmax, ymax),
+                "candidates": candidate_dicts,
+                "condition" : condition[1:]
+            }
+    
+    # Recherche de candidats numériques et de dates
+    row_candidates_int = [candidate for candidate in columns.get("quantite", {}).get("candidates", []) if candidate["text"][0].isdigit()]
+    row_candidates_date = [candidate for candidate in columns.get("date_prelevement", {}).get("candidates", []) if re.search(r'\b\d{2}/\d{2}/\d{4}\b', " ".join(candidate["text"]))]
+
+    # Gestion des cas où l'une des listes est vide
+    if not row_candidates_int:
+        row_candidates_int = row_candidates_date
+    if not row_candidates_date:
+        row_candidates_date = row_candidates_int
+
+    # Choix des candidats selon la longueur
+    if len(row_candidates_int) == len(row_candidates_date):
+        row_candidate = row_candidates_int
+    else:
+        row_candidate = max(row_candidates_int, row_candidates_date, key=len)
+    
+    # Extraction des lignes horizontales
+    y_lines = get_horizontal_lines(row_candidate, tolerance=50)
+
+    sample_rows_dict = {}
+    for i, y_row in enumerate(y_lines):
+        zone_matches = {}
+        for zone, informations in columns.items():
+            (xmin, ymin, xmax, ymax) = informations["box"]
+            candidate_dicts = [candidates_dict for candidates_dict in informations["candidates"] if abs(y_row - candidates_dict["box"][3]) < 50]
+
+            # Filtrage des candidats selon les conditions
+            match_indices, res_seq = condition_filter(candidate_dicts, informations["condition"], model, application_path, ocr_pathes=OCR_PATHES)
+
+            # Normalisation du texte s'il n'est pas déjà sous forme de liste
+            if len(res_seq)>0 and  isinstance(res_seq, list) and isinstance(res_seq[0], str):
+                res_seq = unidecode(" ".join(res_seq))
+
+            # Création de l'objet ZoneMatch
+            zone_match = ZoneMatch(candidate_dicts, [], 0, [])
+            zone_match.match_indices, zone_match.res_seq = match_indices, res_seq
+            zone_match.confidence = min([candidate_dicts[i]["proba"] for i in zone_match.match_indices]) if zone_match.match_indices else 0
+
+            zone_matches[zone] = {
+                "sequence": zone_match.res_seq,
+                "confidence": float(zone_match.confidence),
+                "area": informations["box"]
+            }
+                            
+            
+        sample_rows_dict[f"sample_{i}/{len(y_lines)}"] = zone_matches
+
+    return sample_rows_dict
+
+def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, zone_key_dict, model, image_name, checkboxes=None, show=False):
+    """
+    Extrait le texte souhaité des zones définies dans l'image recadrée.
+
+    Args:
+    - cropped_image: Image recadrée à analyser.
+    - zone_key_match_dict: Dictionnaire associant les zones aux correspondances OCR.
+    - full_img_OCR: Liste des séquences OCR extraites de l'image complète.
+    - zone_key_dict: Dictionnaire définissant les zones et leurs conditions.
+    - model: Modèle utilisé pour filtrer les candidats.
+    - image_name: Nom de l'image traitée.
+    - checkboxes: Liste optionnelle de cases à cocher.
+    - show: Booléen indiquant s'il faut afficher les résultats.
+
+    Returns:
+    - zone_matches: Dictionnaire des correspondances de zones.
+    """
+    sample_rows_dict = get_samples_rows_dict(cropped_image, zone_key_match_dict, full_img_OCR, zone_key_dict, model)
     
     zone_matches = {}
-    for zone, key_points in MODEL_HELPER.items():
-        key_match =  zone_key_match_dict[zone]
-        box = key_match.OCR["box"]
+    for zone, key_points in zone_key_dict.items():
         condition, relative_position = key_points["conditions"], key_points["relative_position"]
-        # If the key match is not found, the searching area is the subregion of the field
-        xmin, ymin, xmax, ymax = box if key_match.confidence==-1 else get_area(cropped_image, box, relative_position, corr_ratio=1.15)
-        
-        candidate_dicts = [dict_sequence for dict_sequence in full_img_OCR if 
-                      (xmin<dict_sequence["box"][0]<xmax) and (ymin<dict_sequence["box"][1]<ymax)]
-                
-        zone_match = ZoneMatch(candidate_dicts, [], 0, [])
+        if condition[0] != "table":
+            key_match = zone_key_match_dict[zone]
+            box = key_match.OCR["box"]
 
-        # print(zone, " : ", candidate_dicts)
-   
-        match_indices, res_seq = condition_filter(candidate_dicts, condition, model, application_path, ocr_pathes=OCR_PATHES, checkboxes=checkboxes)
+            # Calcul de la zone de recherche
+            if key_match.confidence == -1:
+                xmin, ymin, xmax, ymax = box
+            else:
+                xmin, ymin, xmax, ymax = get_area(cropped_image, box, relative_position, corr_ratio=1.15)
+            
+            # Filtrage des candidats OCR
+            candidate_dicts = [dict_sequence for dict_sequence in full_img_OCR if 
+                               xmin < dict_sequence["box"][0] < xmax and ymin < dict_sequence["box"][1] < ymax]
+                    
+            zone_match = ZoneMatch(candidate_dicts, [], 0, [])
 
-        if type(res_seq[0]) != type([]):
-            res_seq = unidecode(" ".join(res_seq))
+            # Filtrage des candidats selon les conditions
+            match_indices, res_seq = condition_filter(candidate_dicts, condition, model, application_path, ocr_pathes=OCR_PATHES, checkboxes=checkboxes)
 
-        zone_match.match_indices , zone_match.res_seq = match_indices, res_seq
-        zone_match.confidence = min([candidate_dicts[i]["proba"] for i in zone_match.match_indices]) if zone_match.match_indices else 0
+            # Normalisation du texte s'il n'est pas déjà sous forme de liste
+            if len(res_seq)>0 and  isinstance(res_seq, list) and isinstance(res_seq[0], str):
+                res_seq = unidecode(" ".join(res_seq))
 
-        zone_matches[zone] = {
-                "sequence" : zone_match.res_seq,
-                "confidence" : float(zone_match.confidence),
-                "area" : (int(xmin), int(ymin), int(xmax), int(ymax))
+            # Mise à jour de l'objet ZoneMatch
+            zone_match.match_indices, zone_match.res_seq = match_indices, res_seq
+            zone_match.confidence = min([candidate_dicts[i]["proba"] for i in zone_match.match_indices]) if zone_match.match_indices else 0
+
+            zone_matches[zone] = {
+                "sequence": zone_match.res_seq,
+                "confidence": float(zone_match.confidence),
+                "area": (int(xmin), int(ymin), int(xmax), int(ymax))
             }
         
-        if show:
-            print(zone, ": ", res_seq)
-            #print(box, key_match.confidence, (xmin, ymin, xmax, ymax))
-            plt.imshow(cropped_image[ymin:ymax, xmin:xmax])
-            plt.show()
+            if show:
+                print(zone, "_commune: ", res_seq)
+                plt.imshow(cropped_image[ymin:ymax, xmin:xmax])
+                plt.show()
 
-    return zone_matches 
+    res_samples = {}
 
-def model_particularities(zone_matches):
-    # Add M/V to the navire
-    zone_matches["navire"]["sequence"] = "M/V - " + zone_matches["navire"]["sequence"]
+    for i_sample, sample_row_dict in enumerate(sample_rows_dict.values()):
+        zone_matches_copy = deepcopy(zone_matches)
+        zone_matches_copy.update(sample_row_dict)
 
-    # Delte scelles mistake
-    zone_matches["scelles"]["sequence"] = [] if jaro_distance(zone_matches["scelles"]["sequence"].lower(), "autres")>0.90 else zone_matches["scelles"]["sequence"]
+        res_samples[f"sample_{image_name}_{i_sample}"] = {
+            "IMAGE": image_name,
+            "EXTRACTION": zone_matches_copy
+        }
 
-    # Select a product Code
-    product_code_dict = ["Ble tendre", "Ble dur", "Fourrage orge", "Orge de brasserie"]
+    return res_samples
 
-    marchandise = zone_matches["marchandise"]["sequence"]
-    product_code = ""
-    for pc in product_code_dict:
-        if jaro_distance(unidecode(pc.upper()), marchandise)>0.95:
-            product_code = pc
-    zone_matches["code_produit"] = deepcopy(zone_matches["marchandise"])
-    zone_matches["code_produit"]["sequence"] = product_code 
+def model_particularities(sample_matches):
 
-    return zone_matches
+    for sample, zone_matches in sample_matches.items():
+       continue
+    
+    return sample_matches
 
-def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, checkboxes=None, MODEL_HELPER=MODEL_HELPER):
+def convert_to_native_types(obj):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_to_native_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_native_types(item) for item in obj]
+    else:
+        return obj
+    
+def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, image_name, checkboxes=None, MODEL_HELPER=MODEL_HELPER):
     """
     The main fonction to extract text from FDA
 
@@ -326,13 +466,22 @@ def textExtraction(cropped_image, zone_key_match_dict, full_img_OCR, model, chec
         }
     """
 
-    zone_matches = get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, checkboxes=checkboxes, show=False)
-    zone_matches = model_particularities(zone_matches)
+    sample_matches = get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, MODEL_HELPER, model, image_name, checkboxes=checkboxes, show=False)
+    sample_matches = model_particularities(sample_matches)
 
-    for zone, dict in zone_matches.items():
-        print(zone, ":", dict["sequence"])
+    def move_key_to_end(d, key_to_move):
+        if key_to_move in d:
+            value = d.pop(key_to_move)
+            d[key_to_move] = value
+        return d
 
-    return zone_matches
+
+    for sample, sample_dict in sample_matches.items():
+        sample_dict['EXTRACTION'] = move_key_to_end(sample_dict['EXTRACTION'], 'analyse')
+        print(sample, ":", sample_dict["EXTRACTION"])
+
+
+    return sample_matches
 
 def main(scan_dict, model=MODEL):
 
@@ -348,25 +497,20 @@ def main(scan_dict, model=MODEL):
             # image = get_adjusted_image(image, show=False)
             # plt.imsave("im.png", image, cmap="gray")
 
-            templates_pathes = [os.path.join(CHECK_PATH, dir) for dir in os.listdir(CHECK_PATH) if os.path.splitext(dir)[1].lower() in [".png", ".jpg"]]
-            checkboxes = get_checkboxes(image, templates_pathes=templates_pathes, show=False) # List of checkbox dict {"TOP_LEFT_X"...}
-
             # plt.imshow(image)
             # plt.show()
 
-            zone_key_match_dict, full_img_OCR = get_key_matches_and_OCR(image, checkboxes, show=False)
+            zone_key_match_dict, full_img_OCR = get_key_matches_and_OCR(image, show=False)
 
-            sample_matches = textExtraction(image, zone_key_match_dict, full_img_OCR, model, checkboxes=checkboxes, MODEL_HELPER=MODEL_HELPER)
-
+            all_sample_matches = textExtraction(image, zone_key_match_dict, full_img_OCR, model, image_name, checkboxes=False, MODEL_HELPER=MODEL_HELPER)
             # Here one scan = one sample
-            pdfs_res_dict[pdf][f"sample_{i_image}"] = {"IMAGE" : image_name,
-                                              "EXTRACTION" : sample_matches} # Image Name
+            pdfs_res_dict[pdf].update(all_sample_matches)
     
-    return pdfs_res_dict
+    return convert_to_native_types(pdfs_res_dict)
 
 if __name__ == "__main__":
 
-    path = r"C:\Users\CF6P\Desktop\ECAR\Data\CU\NON OAIC\CU.pdf"
+    path = r"C:\Users\CF6P\Desktop\ECAR\Data\Nutriset\Nutriset.pdf"
 
     from ProcessPDF import PDF_to_images
     import os
@@ -381,4 +525,4 @@ if __name__ == "__main__":
     for im_n, im in zip(images_names, images):
         scan_dict["debug"].update({im_n : im})
 
-    main(scan_dict, model="CU hors OAIC")
+    main(scan_dict, model="Nutriset")
