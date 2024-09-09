@@ -10,24 +10,6 @@
 
     "Nutriset": {
 
-        "nom" : {
-            "global_info" : 1,
-            "subregion" : {
-                "frac_y_min" : 0,
-                "frac_y_max" : 0.3,
-                "frac_x_min" : 0,
-                "frac_x_max" : 0.5
-            },         
-            "key_sentences" : ["De la part de:"],
-            "relative_position" : {
-                "y_min" : -0.2,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3
-            },     
-            "conditions" : ["after_key", {"after": "De la part de:", "before":"A l'attention de:"}]
-        },
-
         "N_commande" : {
             "global_info" : 1,
             "subregion" : {
@@ -64,24 +46,6 @@
             "conditions" : ["after_key", {"after":"OA N°:", "before":""}]
         },
 
-        "classement" : {
-            "global_info" : 1,
-            "subregion" : {
-                "frac_y_min" : 0.2,
-                "frac_y_max" : 0.6,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },
-            "key_sentences" : ["Classement"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 1,
-                "x_min" : 0,
-                "x_max" : 3.5
-            },
-            "conditions" : ["after_key", {"after" : "Classement", "before" : ""}]
-        },
-
         "type_produit" : {
             "global_info" : 1,
             "subregion" : {
@@ -98,24 +62,6 @@
                 "x_max" : 3.5
             },
             "conditions" : ["format", "N+ - L"]
-        },
-
-        "N_echantillon" : {
-            "global_info" : 0,
-            "subregion" : {
-                "frac_y_min" : 0.3,
-                "frac_y_max" : 0.7,
-                "frac_x_min" : 0,
-                "frac_x_max" : 1
-            },       
-            "key_sentences" : ["N° d'ECH"],
-            "relative_position" : {
-                "y_min" : -0.5,
-                "y_max" : 5,
-                "x_min" : -0.3,
-                "x_max" : 1.1
-            },
-            "conditions" : ["table", "cell"]
         },
 
         "ligne_production" : {

@@ -426,7 +426,7 @@ def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, zone_key_d
         zone_matches_copy = deepcopy(zone_matches)
         zone_matches_copy.update(sample_row_dict)
 
-        res_samples[f"sample_{image_name}_{i_sample}"] = {
+        res_samples[f"{image_name}_SAMPLE_{i_sample}/{len(sample_rows_dict)}"] = {
             "IMAGE": image_name,
             "EXTRACTION": zone_matches_copy
         }
@@ -435,9 +435,10 @@ def get_wanted_text(cropped_image, zone_key_match_dict, full_img_OCR, zone_key_d
 
 def model_particularities(sample_matches):
 
-    for sample, zone_matches in sample_matches.items():
-       continue
-    
+    for sample, sample_dict in sample_matches.items():
+       sample_dict["EXTRACTION"]["analyse"]["sequence"] = sample_dict["EXTRACTION"]["analyse"]["sequence"][:8]
+       del sample_dict["EXTRACTION"]["quantite"]
+
     return sample_matches
 
 def convert_to_native_types(obj):

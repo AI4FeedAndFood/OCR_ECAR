@@ -73,7 +73,7 @@ def listSuggestionWindow(sugg_values, mainWindow, verif_event):
     return sg.Window('Title', layout, no_titlebar=True, keep_on_top=True,
         location=(x, y), margins=(0, 0), finalize=True)
 
-def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
+def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim, sample_name=None):
     clean_names_dict = LIMS_HELPER["CLEAN_ZONE_NAMES"]
     conf_threshold = int(GUIsettings["TOOL"]["confidence_threshold"])/100   
     lineLayout = []
@@ -94,17 +94,31 @@ def _getFieldsLayout(extract_dict, last_info, model, X_main_dim, Y_main_dim):
         pructcode_combo = [sg.Text("Code produit", s=(25,1)), sg.Combo(list(product_codes.keys()), default_value=found_product_code,
             key=("zone", "code_produit"), expand_y=True, expand_x=False, size=(INPUT_LENGTH, 1))]
         lineLayout.append(pructcode_combo)
+    else:
+        if sample_name:
+            if "SAMPLE_" in sample_name:
+                point = str(sample_name.split("_")[-1])
+                lineLayout.append([sg.Text(f"Echantillon: {point}", s=(25,1))])
+
+        lineLayout.append([sg.T("Client :"), sg.Push(), 
+                           sg.Radio('Nutriset - 530', "client", default=True, key=("client", "530")), 
+                           sg.Radio('Nutriset - 210', "client", key=("client", "210"), default=False), 
+                           sg.Radio('Nutriset - 211', "client", key=("client", "211"), default=False), 
+                           sg.Radio('Nutriset - 908', "client", key=("client", "908"), default=False), 
+                           sg.Push()])
+
 
     # Returned the tool's response for each field
     for zone, landmark_text_dict in extract_dict.items():
-        if not zone in added_field: # Field filled by the technicien
+        if not zone in added_field : # Field filled by the technicien
 
             # Add a line when filed pass from global to sample specific
             if OCR_HELPER[model][zone]["global_info"] != global_field:
                 lineLayout.append([sg.HorizontalSeparator()])
 
             global_field = OCR_HELPER[model][zone]["global_info"]
-            clean_zone_name = clean_names_dict[zone]
+
+            clean_zone_name = clean_names_dict[zone] 
             text = f"{clean_zone_name} : "
             sequence = landmark_text_dict["sequence"]
             
@@ -169,11 +183,11 @@ def _getImageLayout(image, X_main_dim, Y_main_dim):
     
     return imageLayout
 
-def getMainLayout(image_dict, last_info, image, model, X_dim, Y_dim, add=False):
+def getMainLayout(image_dict, last_info, image, model, X_dim, Y_dim, add=False, sample_name=None):
 
     X_main_dim, Y_main_dim = int(X_dim*0.9), int(0.85*Y_dim)
 
-    i_ana, FiledsLayout = _getFieldsLayout(image_dict, last_info, model, X_main_dim, Y_main_dim)
+    i_ana, FiledsLayout = _getFieldsLayout(image_dict, last_info, model, X_main_dim, Y_main_dim, sample_name=sample_name)
     ImageLayout =_getImageLayout(image, X_main_dim, Y_main_dim)
     MainLayout = [
         [sg.Text("Attention : Veuillez bien vérifier les champs proposés"), sg.Push(), sg.Button("Consignes d'utilisation", k="-consignes-")],
@@ -421,7 +435,7 @@ def main():
                                 image =  get_image(scan_dict, pdf_name, sample_image_extract["IMAGE"])
                                 extract_dict = sample_image_extract["EXTRACTION"]
                                 # Create the new window
-                                i_ana, VerificactionLayout = getMainLayout(extract_dict, last_info, image, interface_model, X_dim, Y_dim)
+                                i_ana, VerificactionLayout = getMainLayout(extract_dict, last_info, image, interface_model, X_dim, Y_dim, sample_name=sample_name)
                                 VerificationWindow = sg.Window(f"PDF {pdf_name} - Commande ({sample_name})", 
                                                             VerificactionLayout, use_custom_titlebar=True, location=(X_loc, Y_loc), 
                                                             size=(X_dim, Y_dim), resizable=True, finalize=True)

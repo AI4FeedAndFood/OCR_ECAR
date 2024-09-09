@@ -90,10 +90,14 @@ def keepNeededFields(verified_dict, client_contract, model, productcode_dict):
 
     # Find the Contract and the quotation according to the data
     client = verified_dict["client"]
-    clientName = "CU" if "CU" in model else model
-    oaic = "Oui" if model == "CU OAIC" else "Non"
+    if "CU" in model:
+        clientName = f"CU_{client}"
+        oaic = "Oui" if model == "CU OAIC" else "Non"
+        corresponding_row = client_contract[(client_contract["ClientName"]==clientName) & (client_contract["OAIC"]==oaic)]
+    else:
+        clientName = f"Nutriset_{client}"
+        corresponding_row = client_contract[(client_contract["ClientName"]==clientName)]
 
-    corresponding_row = client_contract[(client_contract["ClientName"]==clientName) & (client_contract["Client"]==client) & (client_contract["OAIC"]==oaic)]
     CustomerCode, Contractcode, QuotationCode = list(corresponding_row["CustomerCode"])[0], list(corresponding_row["ContractCode"])[0], list(corresponding_row["QuotationCode"])[0]
 
     if len(corresponding_row) == 1:

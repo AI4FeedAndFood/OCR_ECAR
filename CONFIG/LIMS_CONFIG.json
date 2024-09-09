@@ -36,7 +36,6 @@
             "navire": "Nom du navire",
             "nom": "Nom",
             "port": "Port de chargement",
-            "quantite": "Quantite",
             "reference": "Reference",
             "scelles": "Scelles",
             "specification": "specification",
@@ -176,10 +175,6 @@
         },
 
         "Nutriset": {    
-            "Name" : {
-                "path" : "Order.Name",
-                "input": "Name"
-            },
             "RecipientLabCode" : {
                 "path" : "Order.RecipientLabCode",
                 "input": "HARDCODE",
@@ -191,12 +186,7 @@
             },
             "PurchaseOrderReference" : {
                 "path" : "Order.PurchaseOrderReference",
-                "input": ["navire", "reference"],
-                "join" : " "
-            },
-            "OrderComment" : {
-                "path" : "Order.Comment",
-                "input": ["navire", "marchandise"],
+                "input": ["N_commande", "N_OA"],
                 "join" : " - "
             },
             "QuotationCode" : {
@@ -209,12 +199,12 @@
             },
             "CustomerReference" : {
                 "path" : "Order.Samples.Sample.CustomerReference",
-                "input": "navire"
+                "input": ["N_commande", "N_OA"],
+                "join" : " - "
             },
             "SampleDescription" : {
                 "path" : "Order.Samples.Sample.Description",
-                "input": ["navire", "marchandise"],
-                "join" : " - "
+                "input": "commentaire"
             },
             "RushLevel" : {
                 "path" : "Order.Samples.Sample.RushLevel",
@@ -226,60 +216,30 @@
                 "input": "HARDCODE",
                 "value" : "RUSH"
             },
-            "Température de réception" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.AAA116",
-                "input": "HARDCODE",
-                "value": "AMBIANTE"
-            },
-            "Remis" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF001",
-                "input": "HARDCODE",
-                "value": "CONTROL UNION"
-            },
-            "Nature de la marchandise" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF002",
-                "input": "marchandise"
-            },
-            "Nom du navire" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF003",
-                "input": "navire"
-            },
-            "Tonnage" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF004",
-                "input": "quantite"
-            },
-            "Destination" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.AF0011",
-                "input": "destination"
-            },
-            "Vendeur" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.AF0005",
-                "input": "vendeur"
-            },
-            "Acheteur" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.AF0006",
-                "input": "acheteur"
-            },
-            "Port" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.AF0008",
-                "input": "port"
-            },
-            "Scelles" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF005",
-                "input": "scelles"
-            },
-            "Date et N°BL" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF006",
-                "input": "date"
-            },
-            "Contrat" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF007",
-                "input": "reference"
-            },
-            "Dossier" : {
-                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField.QF011",
-                "input": ["navire", "marchandise"],
+            "N° de commande" : {
+                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField",
+                "input": ["N_commande", "N_OA"],
                 "join" : " - "
+            },
+            "Designation produit" : {
+                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField",
+                "input": "type_produit"
+            },
+            "Ligne de production" : {
+                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField",
+                "input": "ligne_production"
+            },
+            "N° de fabrication" : {
+                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField",
+                "input": "N_fabrication"
+            },
+            "Date de fabrication" : {
+                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField",
+                "input": "date_prelevement"
+            },
+            "Commentaire" : {
+                "path" : "Order.Samples.Sample.AdditionalFields.AdditionalField",
+                "input": "commentaire"
             },
             "FractionCode" : {
                 "path" : "Order.Samples.Sample.SampleFractions.SampleFraction.FractionCode",
